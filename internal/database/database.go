@@ -9,12 +9,11 @@ import (
 )
 
 func Load(cfg *config.Config) (*gorm.DB, error) {
-	// Initialize the database connection using the provided configuration
-	// For example, you can use GORM to connect to a PostgreSQL database
-	dsn := fmt.Sprintf("host=localhost user=%s password=%s dbname=%s port=5432 sslmode=disable",
+	dsn := fmt.Sprintf("host=localhost user=%s password=%s dbname=%s port=%s sslmode=disable",
 		cfg.DataBasseConfig.DatabaseUser,
 		cfg.DataBasseConfig.DatabasePassword,
 		cfg.DataBasseConfig.DatabaseName,
+		cfg.DataBasseConfig.DatabasePort,
 	)
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})

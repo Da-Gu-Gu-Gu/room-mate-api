@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/joho/godotenv"
@@ -10,6 +11,7 @@ type DataBasseConfig struct {
 	DatabaseName     string
 	DatabaseUser     string
 	DatabasePassword string
+	DatabasePort     string
 }
 
 type SERVERConfig struct {
@@ -24,17 +26,21 @@ type Config struct {
 }
 
 func LoadEnv() (*Config, error) {
-	godotenv.Load()
+	if err := godotenv.Load(); err != nil {
+		return nil, fmt.Errorf("load .env failed: %w", err)
+	}
+
 	return &Config{
 		DataBasseConfig: DataBasseConfig{
-			DatabaseName:     os.Getenv("DATABASE-NAME"),
-			DatabaseUser:     os.Getenv("DATABASE-USER"),
-			DatabasePassword: os.Getenv("DATABASE-PASSWORD"),
+			DatabaseName:     os.Getenv("DATABASE_NAME"),
+			DatabaseUser:     os.Getenv("DATABASE_USER"),
+			DatabasePassword: os.Getenv("DATABASE_PASSWORD"),
+			DatabasePort:     os.Getenv("DATABASE_PORT"),
 		},
 		serverConfig: SERVERConfig{
-			Port: os.Getenv("SERVER-PORT"),
-			Env:  os.Getenv("SERVER-ENV"),
+			Port: os.Getenv("SERVER_PORT"),
+			Env:  os.Getenv("SERVER_ENV"),
 		},
-		JWTSecret: os.Getenv("JWT-SECRET"),
+		JWTSecret: os.Getenv("JWT_SECRET"),
 	}, nil
 }
