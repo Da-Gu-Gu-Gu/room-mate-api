@@ -1,1 +1,1 @@
-DROP TABLE IF EXISTS "users-theme";
+DROP TABLE IF EXISTS "users-themes";

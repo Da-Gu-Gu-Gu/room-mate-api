@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS "room"(
+CREATE TABLE IF NOT EXISTS "rooms"(
     "id" UUID NOT NULL,
     "room_name" VARCHAR(255) NOT NULL,
     "room_code" VARCHAR(255) NOT NULL, 

@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS "user"(
+CREATE TABLE IF NOT EXISTS "users"(
     "id" UUID NOT NULL,
     "name" TEXT NOT NULL,
     "profile_url" CHAR(255),

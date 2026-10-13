@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS "theme"(
+CREATE TABLE IF NOT EXISTS "themes"(
     "id" UUID NOT NULL,
     "primary_color" TEXT NOT NULL,
     "secondary_color" TEXT NOT NULL,
