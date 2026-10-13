@@ -5,5 +5,3 @@ CREATE TABLE IF NOT EXISTS "theme"(
     "background_color" TEXT NOT NULL,
     "background_img_url" VARCHAR(255) NULL
 );
-ALTER TABLE
-    "theme" ADD PRIMARY KEY("id");

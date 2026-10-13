@@ -1,4 +1,9 @@
-CREATE TYPE "role" AS ENUM ('owner', 'member');
+DO $$ 
+BEGIN
+    CREATE TYPE role AS ENUM ('owner', 'member');
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
 
 CREATE TABLE IF NOT EXISTS "room_members"(
     "id" UUID NOT NULL,
@@ -8,5 +13,3 @@ CREATE TABLE IF NOT EXISTS "room_members"(
     "joined_at" DATE NOT NULL,
     "leave_at" DATE NOT NULL
 );
-ALTER TABLE
-    "room_members" ADD PRIMARY KEY("id");

@@ -32,7 +32,7 @@ type Status string
 const (
 	Pending  Status = "pending"
 	Accepted Status = "accepted"
-	Declined Status = "declined"
+	Declined Status = "rejected"
 )
 
 type RoomInvitationRequest struct {

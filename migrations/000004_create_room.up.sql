@@ -6,5 +6,4 @@ CREATE TABLE IF NOT EXISTS "room"(
     "created_by" UUID NOT NULL,
     "created_at" DATE NOT NULL
 );
-ALTER TABLE
-    "room" ADD PRIMARY KEY("id");
+

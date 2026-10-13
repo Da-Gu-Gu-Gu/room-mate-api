@@ -1,4 +1,10 @@
-CREATE TYPE "status" AS ENUM ('pending', 'accepted', 'rejected');
+
+DO $$ 
+BEGIN
+    CREATE TYPE status AS ENUM ('pending', 'accepted', 'rejected');
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
 
 CREATE TABLE IF NOT EXISTS "room_invitations"(
     "id" UUID NOT NULL,
@@ -7,5 +13,3 @@ CREATE TABLE IF NOT EXISTS "room_invitations"(
     "status" status NOT NULL,
     "inviter_id" UUID NOT NULL
 );
-ALTER TABLE
-    "room_invitations" ADD PRIMARY KEY("id");

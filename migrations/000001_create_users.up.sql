@@ -5,5 +5,3 @@ CREATE TABLE IF NOT EXISTS "user"(
     "email" VARCHAR(255) NOT NULL UNIQUE,
     "created_at" DATE NOT NULL
 );
-ALTER TABLE
-    "user" ADD PRIMARY KEY("id");
