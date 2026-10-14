@@ -28,10 +28,10 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	{
 		user := api.Group("users")
 		{
-			user.GET("/:userId", SampleRouteHandler)
-			user.POST("", SampleRouteHandler)
-			user.PUT("", SampleRouteHandler)
-			user.DELETE("", SampleRouteHandler)
+			user.GET("/:id", userHandler.GetUserById)
+			user.POST("", userHandler.CreateUser)
+			user.PUT("/:id", userHandler.UpdateUser)
+			user.DELETE("/:id", userHandler.DeleteUser)
 			user.GET("", userHandler.GetUsers) //list
 		}
 

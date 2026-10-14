@@ -1,9 +1,15 @@
 package model
 
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
+
 type User struct {
-	ID         uint   `json:"id"`
-	Name       string `json:"name"`
-	ProfileUrl string `json:"profileUrl"`
-	Email      string `json:"email"`
-	CreatedAt  string `json:"createdAt"`
+	ID         uuid.UUID `json:"id" gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	Name       string    `json:"name"`
+	ProfileUrl string    `json:"profileUrl"`
+	Email      string    `json:"email"`
+	CreatedAt  time.Time `json:"createdAt"`
 }
