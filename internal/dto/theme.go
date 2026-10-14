@@ -1,10 +1,10 @@
 package dto
 
 type ThemeRequest struct {
-	PrimaryColor    string  `json:"primaryColor" binding:"required"`
-	SecondaryColor  string  `json:"secondaryColor" binding:"required"`
-	BackgroundColor string  `json:"backgroundColor" binding:"required"`
-	BackgroundImage *string `json:"backgroundImage"`
+	PrimaryColor     string  `json:"primaryColor" binding:"required"`
+	SecondaryColor   string  `json:"secondaryColor" binding:"required"`
+	BackgroundColor  string  `json:"backgroundColor" binding:"required"`
+	BackgroundImgUrl *string `json:"backgroundImgUrl"`
 }
 
 type ThemeResponse struct {
@@ -21,4 +21,11 @@ type UserThemeRequest struct {
 
 type UserThemeResponse struct {
 	Theme ThemeResponse `json:"theme"`
+}
+
+type UpdateThemeRequest struct {
+	PrimaryColor     *string `json:"primaryColor"`
+	SecondaryColor   *string `json:"secondaryColor"`
+	BackgroundColor  *string `json:"backgroundColor"`
+	BackgroundImgUrl *string `json:"backgroundImgUrl"`
 }

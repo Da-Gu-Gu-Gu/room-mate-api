@@ -6,7 +6,7 @@ EXCEPTION
 END $$;
 
 CREATE TABLE IF NOT EXISTS "room_members"(
-    "id" UUID NOT NULL,
+    "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     "room_id" UUID NOT NULL,
     "user_id" UUID NOT NULL,
     "role" role NOT NULL,

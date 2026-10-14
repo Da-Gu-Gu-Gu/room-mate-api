@@ -1,9 +1,11 @@
 package model
 
+import "github.com/google/uuid"
+
 type Theme struct {
-	ID              uint    `json:"id"`
-	PrimaryColor    string  `json:"primaryColor"`
-	SecondaryColor  string  `json:"secondaryColor"`
-	BackgroundColor string  `json:"backgroundColor"`
-	BackgroundImage *string `json:"backgroundImage"`
+	ID               uuid.UUID `json:"id" gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	PrimaryColor     string    `json:"primaryColor"`
+	SecondaryColor   string    `json:"secondaryColor"`
+	BackgroundColor  string    `json:"backgroundColor"`
+	BackgroundImgUrl *string   `json:"backgroundImgUrl"`
 }

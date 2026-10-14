@@ -34,10 +34,10 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		theme := api.Group("themes")
 		{
 			theme.GET("/:id", themeHandler.GetThemeById)
-			theme.POST("", SampleRouteHandler)
-			theme.PUT("", SampleRouteHandler)
-			theme.DELETE("", SampleRouteHandler)
-			theme.GET("", SampleRouteHandler) //list
+			theme.POST("", themeHandler.CreateTheme)
+			theme.PUT("/:id", themeHandler.UpdateTheme)
+			theme.DELETE("/:id", themeHandler.DeleteTheme)
+			theme.GET("", themeHandler.GetThemes) //list
 		}
 
 		room := api.Group("rooms")

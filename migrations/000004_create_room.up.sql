@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS "rooms"(
-    "id" UUID NOT NULL,
+    "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     "room_name" VARCHAR(255) NOT NULL,
     "room_code" VARCHAR(255) NOT NULL, 
     "room_number" VARCHAR(255) NOT NULL,
