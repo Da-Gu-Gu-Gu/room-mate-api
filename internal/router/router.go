@@ -20,6 +20,10 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	themeService := service.NewThemeService(themeRepository)
 	themeHandler := handler.NewThemeHandler(themeService)
 
+	userRepository := repository.NewUserRepository(db)
+	userService := service.NewUserService(*&userRepository)
+	userHandler := handler.NewUserHandler(*&userService)
+
 	api := router.Group("api/v1")
 	{
 		user := api.Group("users")
@@ -28,7 +32,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 			user.POST("", SampleRouteHandler)
 			user.PUT("", SampleRouteHandler)
 			user.DELETE("", SampleRouteHandler)
-			user.GET("", SampleRouteHandler) //list
+			user.GET("", userHandler.GetUsers) //list
 		}
 
 		theme := api.Group("themes")
