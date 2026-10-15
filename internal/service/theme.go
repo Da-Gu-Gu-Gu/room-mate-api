@@ -38,10 +38,12 @@ func (s *ThemeService) GetThemes() ([]*model.Theme, error) {
 
 func (s *ThemeService) CreateTheme(req *dto.ThemeRequest) (*model.Theme, error) {
 	theme := &model.Theme{
-		PrimaryColor:     req.PrimaryColor,
-		SecondaryColor:   req.SecondaryColor,
-		BackgroundColor:  req.BackgroundColor,
-		BackgroundImgUrl: req.BackgroundImgUrl,
+		PrimaryColor:    req.PrimaryColor,
+		SecondaryColor:  req.SecondaryColor,
+		BackgroundColor: req.BackgroundColor,
+	}
+	if req.BackgroundImgUrl != nil {
+		theme.BackgroundImgUrl = req.BackgroundImgUrl
 	}
 	if err := s.themeRepository.Create(theme); err != nil {
 		return nil, fmt.Errorf("failed to create theme: %w", err)
@@ -77,7 +79,7 @@ func (s *ThemeService) UpdateTheme(themeId uuid.UUID, req *dto.UpdateThemeReques
 		theme.BackgroundImgUrl = *&req.BackgroundImgUrl
 	}
 
-	err = s.themeRepository.Update(themeId, theme)
+	err = s.themeRepository.Update(theme)
 	if err != nil {
 		return nil, err
 	}

@@ -16,7 +16,7 @@ type ThemeRepository interface {
 	Create(theme *model.Theme) error
 	FindAll() ([]*model.Theme, error)
 	Delete(themeId uuid.UUID) error
-	Update(themeId uuid.UUID, theme *model.Theme) error
+	Update(theme *model.Theme) error
 }
 
 func NewThemeRepository(db *gorm.DB) *themeRepository {
@@ -55,7 +55,7 @@ func (r *themeRepository) Delete(themeId uuid.UUID) error {
 	return nil
 }
 
-func (r *themeRepository) Update(themId uuid.UUID, theme *model.Theme) error {
+func (r *themeRepository) Update(theme *model.Theme) error {
 	if err := r.db.Save(theme).Error; err != nil {
 		return err
 	}

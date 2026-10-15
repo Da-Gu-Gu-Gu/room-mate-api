@@ -18,5 +18,7 @@ func main() {
 	}
 
 	apisRouter := router.SetupRouter(db)
-	apisRouter.Run()
+	if err := apisRouter.Run(":" + cfg.ServerConfig.Port); err != nil {
+		log.Fatal(err)
+	}
 }

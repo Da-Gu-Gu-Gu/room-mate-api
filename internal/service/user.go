@@ -36,10 +36,13 @@ func (s *UserService) GetUserById(id uuid.UUID) (*model.User, error) {
 }
 
 func (s *UserService) CreateUser(req *dto.UserRequest) (*model.User, error) {
+
 	userModel := &model.User{
-		Name:       req.Name,
-		Email:      req.Email,
-		ProfileUrl: *req.ProfileUrl,
+		Name:  req.Name,
+		Email: req.Email,
+	}
+	if req.ProfileUrl != nil {
+		userModel.ProfileUrl = *req.ProfileUrl
 	}
 	err := s.userRepository.Create(userModel)
 	if err != nil {
@@ -62,7 +65,7 @@ func (s *UserService) UpdateUser(userId uuid.UUID, payload *dto.UserUpdateReques
 	if payload.ProfileUrl != nil {
 		user.ProfileUrl = *payload.ProfileUrl
 	}
-	if err := s.userRepository.Update(userId, user); err != nil {
+	if err := s.userRepository.Update(user); err != nil {
 		return nil, err
 	}
 

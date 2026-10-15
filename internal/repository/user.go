@@ -15,7 +15,7 @@ type UserRepository interface {
 	GET() ([]*model.User, error)
 	GetUser(id uuid.UUID) (*model.User, error)
 	Create(user *model.User) error
-	Update(id uuid.UUID, user *model.User) error
+	Update(user *model.User) error
 	Delete(id uuid.UUID) error
 }
 
@@ -50,7 +50,7 @@ func (r *userRepository) Create(user *model.User) error {
 	return nil
 }
 
-func (r *userRepository) Update(id uuid.UUID, user *model.User) error {
+func (r *userRepository) Update(user *model.User) error {
 	if err := r.db.Save(user).Error; err != nil {
 		return err
 	}

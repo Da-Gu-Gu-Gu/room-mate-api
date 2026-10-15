@@ -64,7 +64,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 }
 
 func SampleRouteHandler(c *gin.Context) {
-	c.JSON(200, gin.H{
+	c.JSON(501, gin.H{
 		"message": "This is a sample route",
 	})
 }

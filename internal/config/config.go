@@ -22,7 +22,7 @@ type SERVERConfig struct {
 type Config struct {
 	DataBasseConfig DataBasseConfig
 	JWTSecret       string
-	serverConfig    SERVERConfig
+	ServerConfig    SERVERConfig
 }
 
 func LoadEnv() (*Config, error) {
@@ -37,7 +37,7 @@ func LoadEnv() (*Config, error) {
 			DatabasePassword: os.Getenv("DATABASE_PASSWORD"),
 			DatabasePort:     os.Getenv("DATABASE_PORT"),
 		},
-		serverConfig: SERVERConfig{
+		ServerConfig: SERVERConfig{
 			Port: os.Getenv("SERVER_PORT"),
 			Env:  os.Getenv("SERVER_ENV"),
 		},
