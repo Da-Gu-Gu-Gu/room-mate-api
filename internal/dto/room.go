@@ -1,6 +1,10 @@
 package dto
 
-import "github.com/google/uuid"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 type RoomRequest struct {
 	RoomName  string    `json:"roomName" binding:"required"`
@@ -13,22 +17,27 @@ type RoomResponse struct {
 	RoomCode   string               `json:"roomCode"`
 	Theme      ThemeResponse        `json:"theme"`
 	RoomMember []RoomMemberResponse `json:"roomMember"`
+	CreatedAt  time.Time            `json:"createdAt"`
+	UpdatedAt  time.Time            `json:"updatedAt"`
 }
 
 type RoomMemberResponse struct {
-	ID         uuid.UUID `json:"id"`
-	Name       string    `json:"name"`
-	ProfileUrl string    `json:"profileUrl"`
-	Email      string    `json:"email"`
-	Role       string    `json:"role"`
-	JoinedAt   string    `json:"joinedAt"`
-	LeaveAt    string    `json:"-"`
+	ID         uint       `json:"id"`
+	Name       string     `json:"name"`
+	ProfileUrl string     `json:"profileUrl"`
+	Email      string     `json:"email"`
+	Role       string     `json:"role"`
+	JoinedAt   time.Time  `json:"joinedAt"`
+	LeaveAt    *time.Time `json:"leaveAt,omitempty"`
+	CreatedAt  time.Time  `json:"createdAt"`
+	UpdatedAt  time.Time  `json:"updatedAt"`
 }
 
 type RoomMemberRequest struct {
 	RoomID uuid.UUID `json:"roomId" binding:"required"`
 	UserID uuid.UUID `json:"userId" binding:"required"`
 }
+
 type Status string
 
 const (
@@ -45,10 +54,11 @@ type RoomInvitationRequest struct {
 }
 
 type RoomInvitationResponse struct {
-	ID        uuid.UUID `json:"id"`
-	RoomID    uuid.UUID `json:"roomId"`
-	InviterID uuid.UUID `json:"inviterId"`
-	InviteeID uuid.UUID `json:"inviteeId"`
+	ID        uint      `json:"id"`
+	RoomID    uint      `json:"roomId"`
+	InviterID uint      `json:"inviterId"`
+	InviteeID uint      `json:"inviteeId"`
 	Status    Status    `json:"status"`
-	CreatedAt string    `json:"createdAt"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
 }

@@ -11,5 +11,6 @@ type User struct {
 	Name       string    `json:"name"`
 	ProfileUrl string    `json:"profileUrl"`
 	Email      string    `json:"email"`
-	CreatedAt  time.Time `json:"createdAt"`
+	CreatedAt  time.Time `json:"createdAt" gorm:"autoCreateTime"`
+	UpdatedAt  time.Time `json:"updatedAt" gorm:"autoUpdateTime"`
 }
