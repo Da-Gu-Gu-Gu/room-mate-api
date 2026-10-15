@@ -10,10 +10,12 @@ const (
 )
 
 type RoomMember struct {
-	ID       uint       `json:"id"`
-	RoomID   uint       `json:"roomId"`
-	UserID   uint       `json:"userId"`
-	Role     RoleEnum   `json:"role"`
-	joinedAt *time.Time `json:"-"`
-	leaveAt  *time.Time `json:"-"`
+	ID        uint       `json:"id"`
+	RoomID    uint       `json:"roomId"`
+	UserID    uint       `json:"userId"`
+	Role      RoleEnum   `json:"role"`
+	JoinedAt  *time.Time `json:"joinedAt"`
+	LeaveAt   *time.Time `json:"leaveAt"`
+	CreatedAt time.Time  `json:"createdAt" gorm:"autoCreateTime"`
+	UpdatedAt time.Time  `json:"updatedAt" gorm:"autoUpdateTime"`
 }
