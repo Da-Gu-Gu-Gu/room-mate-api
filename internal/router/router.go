@@ -24,6 +24,10 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	userService := service.NewUserService(*&userRepository)
 	userHandler := handler.NewUserHandler(*&userService)
 
+	roomRepository := repository.NewRoomRepository(db)
+	roomService := service.NewRoomService(roomRepository)
+	roomHandler := handler.NewRoomHandler(roomService)
+
 	api := router.Group("api/v1")
 	{
 		user := api.Group("users")
@@ -46,11 +50,11 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 
 		room := api.Group("rooms")
 		{
-			room.GET("/:roomId", SampleRouteHandler)
-			room.POST("", SampleRouteHandler)
-			room.PUT("", SampleRouteHandler)
-			room.DELETE("", SampleRouteHandler)
-			room.GET("", SampleRouteHandler) //list
+			room.GET("/:id", roomHandler.GetRoomById)
+			room.POST("", roomHandler.CreateRoom)
+			room.PUT("/:id", roomHandler.UpdateRoom)
+			room.DELETE("/:id", roomHandler.DeleteRoom)
+			room.GET("", roomHandler.GetRooms) //list
 		}
 	}
 	// Define your routes here

@@ -7,18 +7,22 @@ import (
 )
 
 type RoomRequest struct {
-	RoomName  string    `json:"roomName" binding:"required"`
-	RoomCode  string    `json:"roomCode" binding:"required"`
-	CreatedBy uuid.UUID `json:"createdBy" binding:"required"`
+	RoomName   string    `json:"roomName" binding:"required"`
+	RoomNumber string    `json:"roomNumber" binding:"required"`
+	CreatedBy  uuid.UUID `json:"createdBy" binding:"required"`
 }
 
 type RoomResponse struct {
 	RoomName   string               `json:"roomName"`
 	RoomCode   string               `json:"roomCode"`
-	Theme      ThemeResponse        `json:"theme"`
 	RoomMember []RoomMemberResponse `json:"roomMember"`
 	CreatedAt  time.Time            `json:"createdAt"`
 	UpdatedAt  time.Time            `json:"updatedAt"`
+}
+
+type UpdateRoomRequest struct {
+	RoomName   *string `json:"roomName"`
+	RoomNumber *string `json:"roomNumber"`
 }
 
 type RoomMemberResponse struct {
