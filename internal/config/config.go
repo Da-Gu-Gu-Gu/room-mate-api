@@ -23,6 +23,8 @@ type Config struct {
 	DataBasseConfig DataBasseConfig
 	JWTSecret       string
 	ServerConfig    SERVERConfig
+	GoogleClientId  string
+	AppleClientId   string
 }
 
 func LoadEnv() (*Config, error) {
@@ -41,6 +43,8 @@ func LoadEnv() (*Config, error) {
 			Port: os.Getenv("SERVER_PORT"),
 			Env:  os.Getenv("SERVER_ENV"),
 		},
-		JWTSecret: os.Getenv("JWT_SECRET"),
+		JWTSecret:      os.Getenv("JWT_SECRET"),
+		GoogleClientId: os.Getenv("GOOGLE_CLIENT_ID"),
+		AppleClientId:  os.Getenv("APPLE_CLIENT_ID"),
 	}, nil
 }

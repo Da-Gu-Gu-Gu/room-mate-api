@@ -1,6 +1,8 @@
 package router
 
 import (
+	"log"
+	"room-mate-api/internal/config"
 	"room-mate-api/internal/handler"
 	"room-mate-api/internal/repository"
 	"room-mate-api/internal/service"
@@ -14,6 +16,8 @@ type routeHandler struct {
 }
 
 func SetupRouter(db *gorm.DB) *gin.Engine {
+	cfg, err := config.LoadEnv()
+
 	router := gin.Default()
 
 	themeRepository := repository.NewThemeRepository(db)
@@ -27,6 +31,25 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	roomRepository := repository.NewRoomRepository(db)
 	roomService := service.NewRoomService(roomRepository)
 	roomHandler := handler.NewRoomHandler(roomService)
+
+	googleAuth, err := service.NewGoogleAuthService(
+		cfg.GoogleClientId,
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	authIdentityRepo := repository.NewAuthRepo(db)
+
+	authService := service.NewAuthService(
+
+		googleAuth,
+		authIdentityRepo,
+		cfg.JWTSecret,
+		db,
+	)
+
+	authHandler := handler.NewAuthHandler(authService)
 
 	api := router.Group("api/v1")
 	{
@@ -56,6 +79,8 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 			room.DELETE("/:id", roomHandler.DeleteRoom)
 			room.GET("", roomHandler.GetRooms) //list
 		}
+		api.POST("/auth/google", authHandler.GoogleLogin)
+
 	}
 	// Define your routes here
 	router.GET("/hello", func(c *gin.Context) {
