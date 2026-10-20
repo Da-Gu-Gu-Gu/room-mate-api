@@ -4,6 +4,7 @@ import (
 	"log"
 	"room-mate-api/internal/config"
 	"room-mate-api/internal/handler"
+	"room-mate-api/internal/middleware"
 	"room-mate-api/internal/repository"
 	"room-mate-api/internal/service"
 
@@ -52,8 +53,14 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	authHandler := handler.NewAuthHandler(authService)
 
 	api := router.Group("api/v1")
+	// Public route: users need this to sign in.
+	api.POST("/auth/google", authHandler.GoogleLogin)
+
+	protected := api.Group("")
+	protected.Use(middleware.AuthMiddleware(cfg.JWTSecret))
+
 	{
-		user := api.Group("users")
+		user := protected.Group("users")
 		{
 			user.GET("/:id", userHandler.GetUserById)
 			user.POST("", userHandler.CreateUser)
@@ -62,7 +69,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 			user.GET("", userHandler.GetUsers) //list
 		}
 
-		theme := api.Group("themes")
+		theme := protected.Group("themes")
 		{
 			theme.GET("/:id", themeHandler.GetThemeById)
 			theme.POST("", themeHandler.CreateTheme)
@@ -71,7 +78,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 			theme.GET("", themeHandler.GetThemes) //list
 		}
 
-		room := api.Group("rooms")
+		room := protected.Group("rooms")
 		{
 			room.GET("/:id", roomHandler.GetRoomById)
 			room.POST("", roomHandler.CreateRoom)
@@ -79,7 +86,6 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 			room.DELETE("/:id", roomHandler.DeleteRoom)
 			room.GET("", roomHandler.GetRooms) //list
 		}
-		api.POST("/auth/google", authHandler.GoogleLogin)
 
 	}
 	// Define your routes here
