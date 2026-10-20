@@ -67,6 +67,10 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 			user.PUT("/:id", userHandler.UpdateUser)
 			user.DELETE("/:id", userHandler.DeleteUser)
 			user.GET("", userHandler.GetUsers) //list
+
+			//theme
+			user.POST("/theme", userHandler.CreateUserTheme)
+			user.GET("/me", SampleRouteHandler)
 		}
 
 		theme := protected.Group("themes")

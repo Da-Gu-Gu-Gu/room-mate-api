@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 	"room-mate-api/internal/dto"
+	"room-mate-api/internal/middleware"
 	"room-mate-api/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -97,4 +98,25 @@ func (h *UserHandler) DeleteUser(c *gin.Context) {
 
 	c.JSON(200, "User deleted successfully")
 
+}
+
+func (h *UserHandler) CreateUserTheme(c *gin.Context) {
+	userId, err := uuid.Parse(c.GetString(middleware.UserIDContextKey))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, err.Error())
+		return
+	}
+	var req *dto.UserThemeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, "Bad Request")
+		return
+	}
+
+	userTheme := h.userService.CreateUserTheme(userId, req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, err.Error())
+		return
+	}
+
+	c.JSON(200, userTheme)
 }

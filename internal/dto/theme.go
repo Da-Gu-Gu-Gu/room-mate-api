@@ -1,6 +1,10 @@
 package dto
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 type ThemeRequest struct {
 	PrimaryColor     string  `json:"primaryColor" binding:"required"`
@@ -19,8 +23,7 @@ type ThemeResponse struct {
 }
 
 type UserThemeRequest struct {
-	UserID  uint `json:"userId" binding:"required"`
-	ThemeID uint `json:"themeId" binding:"required"`
+	ThemeID uuid.UUID `json:"themeId" binding:"required"`
 }
 
 type UserThemeResponse struct {

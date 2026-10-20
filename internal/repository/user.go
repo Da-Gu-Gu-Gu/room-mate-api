@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"room-mate-api/internal/dto"
 	"room-mate-api/internal/model"
 
 	"github.com/google/uuid"
@@ -17,6 +18,7 @@ type UserRepository interface {
 	Create(user *model.User) error
 	Update(user *model.User) error
 	Delete(id uuid.UUID) error
+	CreateUserTheme(id uuid.UUID, req *dto.UserThemeRequest) *model.UserTheme
 }
 
 func NewUserRepository(db *gorm.DB) *userRepository {
@@ -62,4 +64,21 @@ func (r *userRepository) Delete(id uuid.UUID) error {
 		return err
 	}
 	return nil
+}
+
+func (r *userRepository) CreateUserTheme(id uuid.UUID, req *dto.UserThemeRequest) *model.UserTheme {
+
+	userTheme := &model.UserTheme{
+		UserID:  id,
+		ThemeID: req.ThemeID,
+	}
+	err := r.db.Create(userTheme).Error
+	if err != nil {
+		return nil
+	}
+	err = r.db.Preload("User").Preload("Theme").First(userTheme, "id = ? ", userTheme.ID).Error
+	if err != nil {
+		return nil
+	}
+	return userTheme
 }
