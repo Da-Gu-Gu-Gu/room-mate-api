@@ -83,3 +83,19 @@ func (s *UserService) CreateUserTheme(userId uuid.UUID, req *dto.UserThemeReques
 	userTheme := s.userRepository.CreateUserTheme(userId, req)
 	return userTheme
 }
+
+func (s *UserService) GetUserTheme(id uuid.UUID) (*model.UserTheme, error) {
+	userTheme, err := s.userRepository.GetUserTheme(id)
+	if err != nil {
+		return nil, err
+	}
+	return userTheme, nil
+}
+
+func (s *UserService) GetAboutMe(id uuid.UUID) (*dto.MeResponse, error) {
+	response, err := s.userRepository.GetAboutMe(id)
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
+}

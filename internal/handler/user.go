@@ -120,3 +120,34 @@ func (h *UserHandler) CreateUserTheme(c *gin.Context) {
 
 	c.JSON(200, userTheme)
 }
+
+func (h *UserHandler) GetUserTheme(c *gin.Context) {
+	userId, err := uuid.Parse(c.GetString(middleware.UserIDContextKey))
+	if err != nil {
+		c.JSON(400, "Bad Request")
+		return
+	}
+	user, err := h.userService.GetUserTheme(userId)
+	if err != nil {
+		c.JSON(400, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+	c.JSON(200, user)
+}
+
+func (h *UserHandler) GetAboutMe(c *gin.Context) {
+	userId, err := uuid.Parse(c.GetString(middleware.UserIDContextKey))
+	if err != nil {
+		c.JSON(400, "Bad Request")
+		return
+	}
+	//
+	response, err := h.userService.GetAboutMe(userId)
+	if err != nil {
+		c.JSON(400, err.Error())
+		return
+	}
+	c.JSON(200, response)
+}

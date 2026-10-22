@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"room-mate-api/internal/dto"
+	"room-mate-api/internal/middleware"
 	"room-mate-api/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -21,7 +22,11 @@ func NewRoomHandler(roomService *service.RoomService) *RoomHandler {
 }
 
 func (h *RoomHandler) CreateRoom(c *gin.Context) {
+	userId, err := uuid.Parse(c.GetString(middleware.UserIDContextKey))
 	var payload dto.RoomRequest
+	if err == nil {
+		payload.CreatedBy = userId
+	}
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		fmt.Print(&payload)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

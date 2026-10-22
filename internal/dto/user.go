@@ -15,16 +15,22 @@ type UserRequest struct {
 }
 
 type UserResponse struct {
-	ID         uuid.UUID `json:"id"`
+	ID         uuid.UUID `json:"id,omitempty"`
 	Name       string    `json:"name"`
-	ProfileUrl string    `json:"profileUrl"`
+	ProfileUrl string    `json:"profileUrl,omitempty"`
 	Email      string    `json:"email"`
-	CreatedAt  time.Time `json:"createdAt"`
-	UpdatedAt  time.Time `json:"updatedAt"`
+	CreatedAt  time.Time `json:"createdAt,omitempty"`
+	UpdatedAt  time.Time `json:"updatedAt,omitempty"`
 }
 
 type UserUpdateRequest struct {
 	Name       *string `json:"name"`
 	Email      *string `json:"email" binding:"omitempty,email"`
 	ProfileUrl *string `json:"profileUrl"`
+}
+
+type MeResponse struct {
+	User  UserResponse  `json:"user"`
+	Room  RoomResponse  `json:"room"`
+	Theme ThemeResponse `json:"theme"`
 }

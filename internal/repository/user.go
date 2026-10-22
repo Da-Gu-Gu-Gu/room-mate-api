@@ -19,6 +19,8 @@ type UserRepository interface {
 	Update(user *model.User) error
 	Delete(id uuid.UUID) error
 	CreateUserTheme(id uuid.UUID, req *dto.UserThemeRequest) *model.UserTheme
+	GetUserTheme(id uuid.UUID) (*model.UserTheme, error)
+	GetAboutMe(id uuid.UUID) (*dto.MeResponse, error)
 }
 
 func NewUserRepository(db *gorm.DB) *userRepository {
@@ -81,4 +83,42 @@ func (r *userRepository) CreateUserTheme(id uuid.UUID, req *dto.UserThemeRequest
 		return nil
 	}
 	return userTheme
+}
+
+func (r *userRepository) GetUserTheme(id uuid.UUID) (*model.UserTheme, error) {
+	var userTheme *model.UserTheme
+	err := r.db.Preload("User").Preload("Theme").First(&userTheme, "user_id= ? ", id).Error
+	if err != nil {
+		return nil, err
+	}
+	return userTheme, err
+}
+
+func (r *userRepository) GetAboutMe(id uuid.UUID) (*dto.MeResponse, error) {
+	userTheme, err := r.GetUserTheme(id)
+	if err != nil {
+		return nil, err
+	}
+	var userRoom model.Room
+	err = r.db.First(&userRoom, "created_by= ? ", id).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &dto.MeResponse{
+		User: dto.UserResponse{
+			Name:       userTheme.User.Name,
+			Email:      userTheme.User.Email,
+			ProfileUrl: userTheme.User.ProfileUrl,
+		},
+		Room: dto.RoomResponse{
+			RoomName: userRoom.RoomName,
+			RoomCode: userRoom.RoomCode,
+		},
+		Theme: dto.ThemeResponse{
+			PrimaryColor:    userTheme.Theme.PrimaryColor,
+			SecondaryColor:  userTheme.Theme.SecondaryColor,
+			BackgroundColor: userTheme.Theme.BackgroundColor,
+		},
+	}, nil
 }

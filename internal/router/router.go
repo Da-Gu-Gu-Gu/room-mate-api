@@ -26,7 +26,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	themeHandler := handler.NewThemeHandler(themeService)
 
 	userRepository := repository.NewUserRepository(db)
-	userService := service.NewUserService(*&userRepository)
+	userService := service.NewUserService(userRepository)
 	userHandler := handler.NewUserHandler(*&userService)
 
 	roomRepository := repository.NewRoomRepository(db)
@@ -60,6 +60,9 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	protected.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 
 	{
+
+		protected.GET("/me", userHandler.GetAboutMe)
+
 		user := protected.Group("users")
 		{
 			user.GET("/:id", userHandler.GetUserById)
@@ -70,7 +73,8 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 
 			//theme
 			user.POST("/theme", userHandler.CreateUserTheme)
-			user.GET("/me", SampleRouteHandler)
+			user.GET("/theme", userHandler.GetUserTheme)
+
 		}
 
 		theme := protected.Group("themes")

@@ -17,9 +17,9 @@ type ThemeResponse struct {
 	PrimaryColor    string    `json:"primaryColor"`
 	SecondaryColor  string    `json:"secondaryColor"`
 	BackgroundColor string    `json:"backgroundColor"`
-	BackgroundImage *string   `json:"backgroundImage"`
-	CreatedAt       time.Time `json:"createdAt"`
-	UpdatedAt       time.Time `json:"updatedAt"`
+	BackgroundImage *string   `json:"backgroundImage,omitempty"`
+	CreatedAt       time.Time `json:"createdAt,omitempty"`
+	UpdatedAt       time.Time `json:"updatedAt,omitempty"`
 }
 
 type UserThemeRequest struct {

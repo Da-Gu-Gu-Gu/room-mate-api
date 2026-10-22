@@ -15,9 +15,9 @@ type RoomRequest struct {
 type RoomResponse struct {
 	RoomName   string               `json:"roomName"`
 	RoomCode   string               `json:"roomCode"`
-	RoomMember []RoomMemberResponse `json:"roomMember"`
-	CreatedAt  time.Time            `json:"createdAt"`
-	UpdatedAt  time.Time            `json:"updatedAt"`
+	RoomMember []RoomMemberResponse `json:"roomMember,omitempty"`
+	CreatedAt  time.Time            `json:"createdAt,omitempty"`
+	UpdatedAt  time.Time            `json:"updatedAt,omitempty"`
 }
 
 type UpdateRoomRequest struct {
