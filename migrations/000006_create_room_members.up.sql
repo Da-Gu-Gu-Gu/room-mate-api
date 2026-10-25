@@ -11,5 +11,5 @@ CREATE TABLE IF NOT EXISTS "room_members"(
     "user_id" UUID NOT NULL,
     "role" role NOT NULL,
     "joined_at" DATE NOT NULL,
-    "leave_at" DATE NOT NULL
+    "leave_at" DATE  NULL
 );

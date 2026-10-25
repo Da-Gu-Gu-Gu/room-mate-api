@@ -79,9 +79,12 @@ func (s *UserService) DeleteUser(id uuid.UUID) error {
 	return nil
 }
 
-func (s *UserService) CreateUserTheme(userId uuid.UUID, req *dto.UserThemeRequest) *model.UserTheme {
-	userTheme := s.userRepository.CreateUserTheme(userId, req)
-	return userTheme
+func (s *UserService) CreateUserTheme(userId uuid.UUID, req *dto.UserThemeRequest) (*model.UserTheme, error) {
+	userTheme, err := s.userRepository.CreateUserTheme(userId, req)
+	if err != nil {
+		return nil, err
+	}
+	return userTheme, nil
 }
 
 func (s *UserService) GetUserTheme(id uuid.UUID) (*model.UserTheme, error) {

@@ -17,7 +17,7 @@ func main() {
 		log.Fatal("got error while connecting to database")
 	}
 
-	apisRouter := router.SetupRouter(db)
+	apisRouter := router.SetupRouter(db, cfg)
 	if err := apisRouter.Run(":" + cfg.ServerConfig.Port); err != nil {
 		log.Fatal(err)
 	}

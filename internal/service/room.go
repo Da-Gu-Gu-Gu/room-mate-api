@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"room-mate-api/internal/dto"
 	"room-mate-api/internal/model"
 	"room-mate-api/internal/repository"
@@ -18,15 +19,15 @@ func NewRoomService(roomRepo repository.RoomRepository) *RoomService {
 	}
 }
 
-func (s *RoomService) CreateRoom(req *dto.RoomRequest) (*model.Room, error) {
+func (s *RoomService) CreateRoom(ctx context.Context, req *dto.RoomRequest) (*model.Room, error) {
 
 	roomModel := &model.Room{
 		RoomName:   req.RoomName,
 		RoomNumber: req.RoomNumber,
 		CreatedBy:  req.CreatedBy,
-		RoomCode:   "123123", //generated random number 6
+		RoomCode:   "232123", //generated random number 6
 	}
-	err := s.roomRepository.CREATE(roomModel)
+	err := s.roomRepository.Create(ctx, roomModel)
 	if err != nil {
 		return nil, err
 	}

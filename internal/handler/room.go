@@ -22,6 +22,7 @@ func NewRoomHandler(roomService *service.RoomService) *RoomHandler {
 }
 
 func (h *RoomHandler) CreateRoom(c *gin.Context) {
+	ctx := c.Request.Context()
 	userId, err := uuid.Parse(c.GetString(middleware.UserIDContextKey))
 	var payload dto.RoomRequest
 	if err == nil {
@@ -33,7 +34,7 @@ func (h *RoomHandler) CreateRoom(c *gin.Context) {
 
 		return
 	}
-	createdRoom, err := h.roomService.CreateRoom(&payload)
+	createdRoom, err := h.roomService.CreateRoom(ctx, &payload)
 	if err != nil {
 		c.JSON(500, "Something Wrong!")
 		return

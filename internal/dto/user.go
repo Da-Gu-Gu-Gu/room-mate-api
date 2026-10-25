@@ -30,7 +30,7 @@ type UserUpdateRequest struct {
 }
 
 type MeResponse struct {
-	User  UserResponse  `json:"user"`
-	Room  RoomResponse  `json:"room"`
-	Theme ThemeResponse `json:"theme"`
+	User  UserResponse   `json:"user"`
+	Room  *RoomResponse  `json:"room,omitempty"`
+	Theme *ThemeResponse `json:"theme,omitempty"`
 }

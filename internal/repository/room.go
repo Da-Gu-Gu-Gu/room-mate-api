@@ -1,7 +1,10 @@
 package repository
 
 import (
+	"context"
+	"fmt"
 	"room-mate-api/internal/model"
+	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -15,7 +18,7 @@ type RoomRepository interface {
 	GET() ([]*model.Room, error)
 	GETBYID(id uuid.UUID) (*model.Room, error)
 	DELETE(id uuid.UUID) error
-	CREATE(payload *model.Room) error
+	Create(ctx context.Context, payload *model.Room) error
 	UPDATE(payload *model.Room) error
 }
 
@@ -49,11 +52,36 @@ func (r *roomRepository) DELETE(id uuid.UUID) error {
 	return nil
 }
 
-func (r *roomRepository) CREATE(payload *model.Room) error {
-	if err := r.db.Create(&payload).Error; err != nil {
-		return err
-	}
-	return nil
+func (r *roomRepository) Create(
+	ctx context.Context,
+	payload *model.Room,
+) error {
+	return r.db.WithContext(ctx).Transaction(
+		func(tx *gorm.DB) error {
+			// 1. Create the room.
+			if err := tx.Create(payload).Error; err != nil {
+				return err
+			}
+
+			// 2. Register the creator as a room member.
+			joinedAt := time.Now()
+
+			roomMember := &model.RoomMember{
+				RoomID:   payload.ID,
+				UserID:   payload.CreatedBy,
+				Role:     "owner",
+				JoinedAt: &joinedAt,
+				// LeaveAt:  &joinedAt,
+			}
+
+			if err := tx.Create(roomMember).Error; err != nil {
+				fmt.Print(err)
+				return err
+			}
+
+			return nil
+		},
+	)
 }
 
 func (r *roomRepository) UPDATE(payload *model.Room) error {

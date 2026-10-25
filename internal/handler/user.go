@@ -66,7 +66,7 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 }
 
 func (h *UserHandler) UpdateUser(c *gin.Context) {
-	userId, err := uuid.Parse(c.Param("id"))
+	userId, err := uuid.Parse(c.GetString(middleware.UserIDContextKey))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, err.Error())
 		return
@@ -86,12 +86,12 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 }
 
 func (h *UserHandler) DeleteUser(c *gin.Context) {
-	id, err := uuid.Parse(c.Param("id"))
+	userId, err := uuid.Parse(c.GetString(middleware.UserIDContextKey))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, err.Error())
 		return
 	}
-	if err := h.userService.DeleteUser(id); err != nil {
+	if err := h.userService.DeleteUser(userId); err != nil {
 		c.JSON(http.StatusBadRequest, err.Error())
 		return
 	}
@@ -112,7 +112,7 @@ func (h *UserHandler) CreateUserTheme(c *gin.Context) {
 		return
 	}
 
-	userTheme := h.userService.CreateUserTheme(userId, req)
+	userTheme, err := h.userService.CreateUserTheme(userId, req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, err.Error())
 		return

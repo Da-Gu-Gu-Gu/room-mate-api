@@ -16,8 +16,7 @@ type routeHandler struct {
 	themeHandler *handler.ThemeHandler
 }
 
-func SetupRouter(db *gorm.DB) *gin.Engine {
-	cfg, err := config.LoadEnv()
+func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 
 	router := gin.Default()
 
@@ -32,6 +31,10 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	roomRepository := repository.NewRoomRepository(db)
 	roomService := service.NewRoomService(roomRepository)
 	roomHandler := handler.NewRoomHandler(roomService)
+
+	roomMemberRepository := repository.NewRoomMemberRepository(db)
+	roomMemberService := service.NewRoomMemberService(roomMemberRepository)
+	roomMemberHandler := handler.NewRoomMemberHandler(roomMemberService)
 
 	googleAuth, err := service.NewGoogleAuthService(
 		cfg.GoogleClientId,
@@ -65,11 +68,14 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 
 		user := protected.Group("users")
 		{
-			user.GET("/:id", userHandler.GetUserById)
+
+			user.PUT("", userHandler.UpdateUser)
+			user.DELETE("", userHandler.DeleteUser)
+
+			// should move to admin portal
 			user.POST("", userHandler.CreateUser)
-			user.PUT("/:id", userHandler.UpdateUser)
-			user.DELETE("/:id", userHandler.DeleteUser)
-			user.GET("", userHandler.GetUsers) //list
+			user.GET("/:id", userHandler.GetUserById)
+			user.GET("", userHandler.GetUsers)
 
 			//theme
 			user.POST("/theme", userHandler.CreateUserTheme)
@@ -88,10 +94,14 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 
 		room := protected.Group("rooms")
 		{
-			room.GET("/:id", roomHandler.GetRoomById)
+
 			room.POST("", roomHandler.CreateRoom)
 			room.PUT("/:id", roomHandler.UpdateRoom)
+			room.GET("/:id", roomHandler.GetRoomById)
 			room.DELETE("/:id", roomHandler.DeleteRoom)
+			room.GET("/:id/member", roomMemberHandler.GetRoomDetail) //member,room only now, next time will get a lot of data
+
+			//should move to admin portal
 			room.GET("", roomHandler.GetRooms) //list
 		}
 

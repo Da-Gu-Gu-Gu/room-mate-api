@@ -11,7 +11,7 @@ type AuthIdentity struct {
 	UserId         uuid.UUID `json:"userId" gorm:"type:uuid;not null"`
 	Provider       string    `json:"provider" gorm:"type:varChar(20);not null"`
 	ProviderUserId string    `json:"-" gorm:"type:varChar(20);not null;unique"`
-	CreatedAt      time.Time `json:"createdAt" gorm:"autoCreatedTime"`
+	CreatedAt      time.Time `json:"createdAt" gorm:"autoCreateTime"`
 
-	User User `json:"-" gorm:"foreignKey:UserID;references:ID"`
+	User User `json:"-" gorm:"foreignKey:UserId;references:ID"`
 }

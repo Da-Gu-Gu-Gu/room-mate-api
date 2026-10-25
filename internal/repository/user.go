@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"errors"
+	"fmt"
 	"room-mate-api/internal/dto"
 	"room-mate-api/internal/model"
 
@@ -18,7 +20,7 @@ type UserRepository interface {
 	Create(user *model.User) error
 	Update(user *model.User) error
 	Delete(id uuid.UUID) error
-	CreateUserTheme(id uuid.UUID, req *dto.UserThemeRequest) *model.UserTheme
+	CreateUserTheme(id uuid.UUID, req *dto.UserThemeRequest) (*model.UserTheme, error)
 	GetUserTheme(id uuid.UUID) (*model.UserTheme, error)
 	GetAboutMe(id uuid.UUID) (*dto.MeResponse, error)
 }
@@ -29,6 +31,7 @@ func NewUserRepository(db *gorm.DB) *userRepository {
 	}
 }
 
+// user
 func (r *userRepository) GET() ([]*model.User, error) {
 	var userList []*model.User
 	if err := r.db.Find(&userList).Error; err != nil {
@@ -68,7 +71,10 @@ func (r *userRepository) Delete(id uuid.UUID) error {
 	return nil
 }
 
-func (r *userRepository) CreateUserTheme(id uuid.UUID, req *dto.UserThemeRequest) *model.UserTheme {
+// end-user
+
+// user-with-theme
+func (r *userRepository) CreateUserTheme(id uuid.UUID, req *dto.UserThemeRequest) (*model.UserTheme, error) {
 
 	userTheme := &model.UserTheme{
 		UserID:  id,
@@ -76,13 +82,13 @@ func (r *userRepository) CreateUserTheme(id uuid.UUID, req *dto.UserThemeRequest
 	}
 	err := r.db.Create(userTheme).Error
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	err = r.db.Preload("User").Preload("Theme").First(userTheme, "id = ? ", userTheme.ID).Error
 	if err != nil {
-		return nil
+		return nil, err
 	}
-	return userTheme
+	return userTheme, nil
 }
 
 func (r *userRepository) GetUserTheme(id uuid.UUID) (*model.UserTheme, error) {
@@ -95,30 +101,67 @@ func (r *userRepository) GetUserTheme(id uuid.UUID) (*model.UserTheme, error) {
 }
 
 func (r *userRepository) GetAboutMe(id uuid.UUID) (*dto.MeResponse, error) {
-	userTheme, err := r.GetUserTheme(id)
+	// 1. The user must exist.
+	user, err := r.GetUser(id)
 	if err != nil {
-		return nil, err
-	}
-	var userRoom model.Room
-	err = r.db.First(&userRoom, "created_by= ? ", id).Error
-	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get user: %w", err)
 	}
 
-	return &dto.MeResponse{
+	response := &dto.MeResponse{
 		User: dto.UserResponse{
-			Name:       userTheme.User.Name,
-			Email:      userTheme.User.Email,
-			ProfileUrl: userTheme.User.ProfileUrl,
+			ID:         user.ID,
+			Name:       user.Name,
+			Email:      user.Email,
+			ProfileUrl: user.ProfileUrl,
+			CreatedAt:  user.CreatedAt,
+			UpdatedAt:  user.UpdatedAt,
 		},
-		Room: dto.RoomResponse{
-			RoomName: userRoom.RoomName,
-			RoomCode: userRoom.RoomCode,
-		},
-		Theme: dto.ThemeResponse{
+	}
+
+	// 2. A custom theme is optional.
+	userTheme, err := r.GetUserTheme(id)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, fmt.Errorf("get user theme: %w", err)
+	}
+
+	if err == nil && userTheme != nil {
+		response.Theme = &dto.ThemeResponse{
 			PrimaryColor:    userTheme.Theme.PrimaryColor,
 			SecondaryColor:  userTheme.Theme.SecondaryColor,
 			BackgroundColor: userTheme.Theme.BackgroundColor,
-		},
-	}, nil
+			BackgroundImage: userTheme.Theme.BackgroundImgUrl,
+			CreatedAt:       userTheme.Theme.CreatedAt,
+			UpdatedAt:       userTheme.Theme.UpdatedAt,
+		}
+	}
+
+	// 3. A room is optional. Find the user's active ,
+	// not just rooms that the user created.
+	var room model.Room
+
+	err = r.db.
+		Table("rooms").
+		Select("rooms.*").
+		Joins("JOIN room_members ON room_members.room_id = rooms.id").
+		Where(
+			"room_members.user_id = ? AND room_members.leave_at IS NULL",
+			id,
+		).
+		Order("room_members.joined_at DESC").
+		First(&room).Error
+
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, fmt.Errorf("get user's room: %w", err)
+	}
+
+	if err == nil {
+		response.Room = &dto.RoomResponse{
+			RoomName:  room.RoomName,
+			RoomCode:  room.RoomCode,
+			CreatedAt: room.CreatedAt,
+			UpdatedAt: room.UpdatedAt,
+		}
+	}
+
+	return response, nil
 }
