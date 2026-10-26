@@ -9,7 +9,7 @@ import (
 type RoomRequest struct {
 	RoomName   string    `json:"roomName" binding:"required"`
 	RoomNumber string    `json:"roomNumber" binding:"required"`
-	CreatedBy  uuid.UUID `json:"createdBy" binding:"required"`
+	CreatedBy  uuid.UUID `json:"-"`
 }
 
 type RoomResponse struct {
