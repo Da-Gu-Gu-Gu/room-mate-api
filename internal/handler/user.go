@@ -33,11 +33,18 @@ func (h *UserHandler) GetUsers(c *gin.Context) {
 }
 
 func (h *UserHandler) GetUserById(c *gin.Context) {
+	actorID, err := uuid.Parse(c.GetString(middleware.UserIDContextKey))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authenticated user"})
+		return
+	}
 	userId, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(400, gin.H{
-			"error": err.Error(),
-		})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
+		return
+	}
+	if userId != actorID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "you can only access your own profile"})
 		return
 	}
 	user, err := h.userService.GetUserById(userId)
