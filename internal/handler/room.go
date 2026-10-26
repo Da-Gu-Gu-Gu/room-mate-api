@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"fmt"
+	"errors"
 	"net/http"
 	"room-mate-api/internal/dto"
 	"room-mate-api/internal/middleware"
@@ -16,82 +16,105 @@ type RoomHandler struct {
 }
 
 func NewRoomHandler(roomService *service.RoomService) *RoomHandler {
-	return &RoomHandler{
-		roomService: roomService,
+	return &RoomHandler{roomService: roomService}
+}
+
+func currentUserID(c *gin.Context) (uuid.UUID, bool) {
+	id, err := uuid.Parse(c.GetString(middleware.UserIDContextKey))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authenticated user"})
+		return uuid.Nil, false
+	}
+	return id, true
+}
+
+func respondRoomError(c *gin.Context, err error) {
+	switch {
+	case errors.Is(err, service.ErrForbidden):
+		c.JSON(http.StatusForbidden, gin.H{"error": "you do not have permission to access this room"})
+	case errors.Is(err, service.ErrNotFound):
+		c.JSON(http.StatusNotFound, gin.H{"error": "room not found"})
+	default:
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 	}
 }
 
 func (h *RoomHandler) CreateRoom(c *gin.Context) {
-	ctx := c.Request.Context()
-	userId, err := uuid.Parse(c.GetString(middleware.UserIDContextKey))
+	userID, ok := currentUserID(c)
+	if !ok {
+		return
+	}
+
 	var payload dto.RoomRequest
-	if err == nil {
-		payload.CreatedBy = userId
-	}
 	if err := c.ShouldBindJSON(&payload); err != nil {
-		fmt.Print(&payload)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	// The creator is derived from the verified token, never from client input.
+	payload.CreatedBy = userID
 
-		return
-	}
-	createdRoom, err := h.roomService.CreateRoom(ctx, &payload)
+	createdRoom, err := h.roomService.CreateRoom(c.Request.Context(), &payload)
 	if err != nil {
-		c.JSON(500, "Something Wrong!")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not create room"})
 		return
 	}
-	c.JSON(200, createdRoom)
-}
-
-func (h *RoomHandler) GetRooms(c *gin.Context) {
-	rooms, err := h.roomService.GetRoom()
-	if err != nil {
-		c.JSON(500, "Something Wrong!")
-		return
-	}
-	c.JSON(200, rooms)
+	c.JSON(http.StatusCreated, createdRoom)
 }
 
 func (h *RoomHandler) GetRoomById(c *gin.Context) {
+	userID, ok := currentUserID(c)
+	if !ok {
+		return
+	}
 	roomID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(400, "Something Wrong!")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid room id"})
 		return
 	}
-	room, err := h.roomService.GetRoomById(roomID)
+	room, err := h.roomService.GetRoomById(userID, roomID)
 	if err != nil {
-		c.JSON(500, "Something Wrong!")
+		respondRoomError(c, err)
 		return
 	}
-	c.JSON(200, room)
+	c.JSON(http.StatusOK, room)
 }
 
 func (h *RoomHandler) UpdateRoom(c *gin.Context) {
+	userID, ok := currentUserID(c)
+	if !ok {
+		return
+	}
 	roomID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(400, "Something Wrong!")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid room id"})
 		return
 	}
 	var payload dto.UpdateRoomRequest
 	if err := c.ShouldBindJSON(&payload); err != nil {
-		c.JSON(400, "Something Wrong!")
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	roomUpdated, err := h.roomService.UpdateRoom(roomID, &payload)
+	updatedRoom, err := h.roomService.UpdateRoom(userID, roomID, &payload)
 	if err != nil {
-		c.JSON(500, "Something Wrong!")
+		respondRoomError(c, err)
+		return
 	}
-	c.JSON(200, roomUpdated)
+	c.JSON(http.StatusOK, updatedRoom)
 }
 
 func (h *RoomHandler) DeleteRoom(c *gin.Context) {
-	roomID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(400, "Something Wrong!")
+	userID, ok := currentUserID(c)
+	if !ok {
 		return
 	}
-	if err := h.roomService.DeleteRoom(roomID); err != nil {
-		c.JSON(500, "Something Wrong!")
+	roomID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid room id"})
+		return
 	}
-
-	c.JSON(200, "Deleted successfully.")
+	if err := h.roomService.DeleteRoom(userID, roomID); err != nil {
+		respondRoomError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "room deleted successfully"})
 }
