@@ -46,7 +46,6 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	authIdentityRepo := repository.NewAuthRepo(db)
 
 	authService := service.NewAuthService(
-
 		googleAuth,
 		authIdentityRepo,
 		cfg.JWTSecret,
@@ -70,26 +69,28 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		{
 
 			user.PUT("", userHandler.UpdateUser)
-			user.DELETE("", userHandler.DeleteUser)
 
 			// should move to admin portal
 			user.POST("", userHandler.CreateUser)
 			user.GET("/:id", userHandler.GetUserById)
 			user.GET("", userHandler.GetUsers)
+			user.DELETE("", userHandler.DeleteUser)
 
 			//theme
-			user.POST("/theme", userHandler.CreateUserTheme)
-			user.GET("/theme", userHandler.GetUserTheme)
+			user.POST("/theme", userHandler.CreateUserTheme) //setting theme to user
+			user.GET("/theme", userHandler.GetUserTheme)     //
 
 		}
 
 		theme := protected.Group("themes")
 		{
+			theme.GET("", themeHandler.GetThemes) //list
+
+			// should move to admin side
 			theme.GET("/:id", themeHandler.GetThemeById)
+			theme.DELETE("/:id", themeHandler.DeleteTheme)
 			theme.POST("", themeHandler.CreateTheme)
 			theme.PUT("/:id", themeHandler.UpdateTheme)
-			theme.DELETE("/:id", themeHandler.DeleteTheme)
-			theme.GET("", themeHandler.GetThemes) //list
 		}
 
 		room := protected.Group("rooms")
@@ -98,11 +99,12 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			room.POST("", roomHandler.CreateRoom)
 			room.PUT("/:id", roomHandler.UpdateRoom)
 			room.GET("/:id", roomHandler.GetRoomById)
-			room.DELETE("/:id", roomHandler.DeleteRoom)
+
 			room.GET("/:id/member", roomMemberHandler.GetRoomDetail) //member,room only now, next time will get a lot of data
 
 			//should move to admin portal
 			room.GET("", roomHandler.GetRooms) //list
+			room.DELETE("/:id", roomHandler.DeleteRoom)
 		}
 
 	}
