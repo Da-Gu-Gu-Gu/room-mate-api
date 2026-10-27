@@ -18,6 +18,8 @@ var (
 	ErrInvitationNotFound = repository.ErrInvitationNotFound
 	ErrInvitationNotPending = repository.ErrInvitationNotPending
 	ErrOwnerCannotLeave = repository.ErrOwnerCannotLeave
+	ErrCannotTransferToSelf = repository.ErrCannotTransferToSelf
+	ErrTargetNotActiveMember = repository.ErrTargetNotActiveMember
 	ErrNotActiveRoomMember = repository.ErrNotActiveRoomMember
 )
 
@@ -61,4 +63,8 @@ func (s *RoomMemberService) RespondInvitation(ctx context.Context, invitationID,
 
 func (s *RoomMemberService) LeaveRoom(ctx context.Context, roomID, userID uuid.UUID) error {
 	return s.roomMemberRepository.LeaveRoom(ctx, roomID, userID)
+}
+
+func (s *RoomMemberService) TransferOwnership(ctx context.Context, roomID, ownerID, newOwnerID uuid.UUID) error {
+	return s.roomMemberRepository.TransferOwnership(ctx, roomID, ownerID, newOwnerID)
 }
