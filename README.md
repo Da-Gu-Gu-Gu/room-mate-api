@@ -11,6 +11,7 @@ All endpoints below require a valid access token.
 | POST | /api/v1/rooms | Create a room. The authenticated user becomes its owner/member atomically. |
 | GET | /api/v1/rooms/:id/members | List active members. The caller must be an active member of the room. |
 | POST | /api/v1/rooms/:id/invitations | Invite a user by inviteeId UUID. Only the room owner can invite. |
+| GET | /api/v1/invitations | List pending invitations for the authenticated user. |
 | POST | /api/v1/invitations/:invitationId/accept | Accept an invitation and join its room. |
 | POST | /api/v1/invitations/:invitationId/decline | Decline an invitation. |
 | POST | /api/v1/rooms/:id/leave | Leave a room as a non-owner member. |
