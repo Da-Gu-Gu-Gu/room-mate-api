@@ -73,6 +73,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			room.DELETE("/:id", roomHandler.DeleteRoom)
 			room.GET("/:id/members", roomMemberHandler.GetRoomDetail)
 			room.POST("/:id/invitations", roomMemberHandler.Invite)
+			room.POST("/:id/transfer-ownership", roomMemberHandler.TransferOwnership)
 			room.POST("/:id/leave", roomMemberHandler.LeaveRoom)
 		}
 
