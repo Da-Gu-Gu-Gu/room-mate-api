@@ -103,6 +103,30 @@ func (h *RoomMember) respondToInvitation(c *gin.Context, accept bool) {
 	c.JSON(http.StatusOK, gin.H{"message": message})
 }
 
+func (h *RoomMember) TransferOwnership(c *gin.Context) {
+	ownerID, ok := currentUserID(c)
+	if !ok {
+		return
+	}
+	roomID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid room id"})
+		return
+	}
+	var req struct {
+		NewOwnerID uuid.UUID `json:"newOwnerId" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "newOwnerId must be a valid UUID"})
+		return
+	}
+	if err := h.roomMemberService.TransferOwnership(c.Request.Context(), roomID, ownerID, req.NewOwnerID); err != nil {
+		respondRoomMemberError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "room ownership transferred successfully"})
+}
+
 func (h *RoomMember) LeaveRoom(c *gin.Context) {
 	userID, ok := currentUserID(c)
 	if !ok {
@@ -128,7 +152,7 @@ func respondRoomMemberError(c *gin.Context, err error) {
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 	case errors.Is(err, service.ErrInvitationNotFound), errors.Is(err, service.ErrNotFound):
 		c.JSON(http.StatusNotFound, gin.H{"error": "room, user, or invitation not found"})
-	case errors.Is(err, service.ErrInvitationNotPending), errors.Is(err, service.ErrOwnerCannotLeave):
+	case errors.Is(err, service.ErrInvitationNotPending), errors.Is(err, service.ErrOwnerCannotLeave), errors.Is(err, service.ErrCannotTransferToSelf), errors.Is(err, service.ErrTargetNotActiveMember):
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 	case errors.Is(err, service.ErrNotActiveRoomMember):
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
