@@ -4,7 +4,6 @@ import (
 	"errors"
 	"net/http"
 
-	"room-mate-api/internal/middleware"
 	"room-mate-api/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -124,5 +123,3 @@ func respondRoomMemberError(c *gin.Context, err error) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 	}
 }
-
-var _ = middleware.UserIDContextKey
