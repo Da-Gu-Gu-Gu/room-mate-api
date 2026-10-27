@@ -76,6 +76,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			room.POST("/:id/leave", roomMemberHandler.LeaveRoom)
 		}
 
+		protected.GET("/invitations", roomMemberHandler.GetMyInvitations)
 		protected.POST("/invitations/:invitationId/accept", roomMemberHandler.AcceptInvitation)
 		protected.POST("/invitations/:invitationId/decline", roomMemberHandler.DeclineInvitation)
 	}
