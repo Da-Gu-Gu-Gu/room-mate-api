@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"net/http"
+
 	"room-mate-api/internal/dto"
 	"room-mate-api/internal/middleware"
 	"room-mate-api/internal/service"
@@ -34,6 +35,8 @@ func respondRoomError(c *gin.Context, err error) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "you do not have permission to access this room"})
 	case errors.Is(err, service.ErrNotFound):
 		c.JSON(http.StatusNotFound, gin.H{"error": "room not found"})
+	case errors.Is(err, service.ErrAlreadyInRoom):
+		c.JSON(http.StatusConflict, gin.H{"error": "you already belong to an active room"})
 	default:
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 	}
@@ -44,18 +47,16 @@ func (h *RoomHandler) CreateRoom(c *gin.Context) {
 	if !ok {
 		return
 	}
-
 	var payload dto.RoomRequest
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	// The creator is derived from the verified token, never from client input.
 	payload.CreatedBy = userID
 
 	createdRoom, err := h.roomService.CreateRoom(c.Request.Context(), &payload)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not create room"})
+		respondRoomError(c, err)
 		return
 	}
 	c.JSON(http.StatusCreated, createdRoom)
