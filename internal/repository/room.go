@@ -44,7 +44,18 @@ func (r *roomRepository) GETBYID(id uuid.UUID) (*model.Room, error) {
 }
 
 func (r *roomRepository) DELETE(id uuid.UUID) error {
-	return r.db.Delete(&model.Room{}, "id = ?", id).Error
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		now := time.Now().UTC()
+		if err := tx.Model(&model.RoomMember{}).
+			Where("room_id = ? AND leave_at IS NULL", id).
+			Updates(map[string]interface{}{"leave_at": now, "updated_at": now}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("room_id = ?", id).Delete(&model.Invitation{}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&model.Room{}, "id = ?", id).Error
+	})
 }
 
 func (r *roomRepository) IsActiveMember(roomID, userID uuid.UUID) (bool, error) {
