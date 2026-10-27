@@ -18,7 +18,9 @@ var (
 	ErrPendingInvitationExists = errors.New("a pending invitation already exists")
 	ErrInvitationNotFound = errors.New("invitation not found")
 	ErrInvitationNotPending = errors.New("invitation is no longer pending")
-	ErrOwnerCannotLeave = errors.New("room owner cannot leave; delete the room or transfer ownership first")
+	ErrOwnerCannotLeave = errors.New("room owner must transfer ownership before leaving")
+	ErrCannotTransferToSelf = errors.New("cannot transfer ownership to yourself")
+	ErrTargetNotActiveMember = errors.New("new owner must be an active member of the room")
 	ErrNotActiveRoomMember = errors.New("user is not an active member of this room")
 )
 
@@ -154,6 +156,69 @@ func (r *roomMemberRepository) LeaveRoom(ctx context.Context, roomID, userID uui
 		now := time.Now().UTC()
 		return tx.Model(&member).Updates(map[string]interface{}{
 			"leave_at": now,
+			"updated_at": now,
+		}).Error
+	})
+}
+
+
+func (r *roomMemberRepository) TransferOwnership(ctx context.Context, roomID, ownerID, newOwnerID uuid.UUID) error {
+	if ownerID == newOwnerID {
+		return ErrCannotTransferToSelf
+	}
+
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Lock the room first so simultaneous ownership transfers serialize.
+		var room model.Room
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			First(&room, "id = ?", roomID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrInvitationNotFound
+			}
+			return err
+		}
+		if room.CreatedBy != ownerID {
+			return ErrRoomMemberForbidden
+		}
+
+		var currentOwner model.RoomMember
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("room_id = ? AND user_id = ? AND leave_at IS NULL AND role = ?", roomID, ownerID, model.RoleAdmin).
+			First(&currentOwner).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrRoomMemberForbidden
+			}
+			return err
+		}
+
+		var nextOwner model.RoomMember
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("room_id = ? AND user_id = ? AND leave_at IS NULL", roomID, newOwnerID).
+			First(&nextOwner).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrTargetNotActiveMember
+			}
+			return err
+		}
+
+		now := time.Now().UTC()
+		if err := tx.Model(&nextOwner).Updates(map[string]interface{}{
+			"role": model.RoleAdmin,
+			"updated_at": now,
+		}).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&currentOwner).Updates(map[string]interface{}{
+			"role": model.RoleMember,
+			"updated_at": now,
+		}).Error; err != nil {
+			return err
+		}
+
+		// Keep rooms.created_by aligned with the current owner because existing
+		// room update/delete authorization checks use this field.
+		return tx.Model(&model.Room{}).Where("id = ?", roomID).Updates(map[string]interface{}{
+			"created_by": newOwnerID,
 			"updated_at": now,
 		}).Error
 	})
