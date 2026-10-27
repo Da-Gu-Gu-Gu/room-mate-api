@@ -22,6 +22,8 @@ type Invitation struct {
 	Status    Status    `json:"status" gorm:"type:status;not null;default:pending"`
 	CreatedAt time.Time `json:"createdAt" gorm:"autoCreateTime"`
 	UpdatedAt time.Time `json:"updatedAt" gorm:"autoUpdateTime"`
+
+	Room Room `json:"room" gorm:"foreignKey:RoomID;references:ID"`
 }
 
 func (Invitation) TableName() string { return "room_invitations" }
