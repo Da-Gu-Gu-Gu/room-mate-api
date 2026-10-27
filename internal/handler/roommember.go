@@ -18,6 +18,19 @@ func NewRoomMemberHandler(roomMemberService *service.RoomMemberService) *RoomMem
 	return &RoomMember{roomMemberService: roomMemberService}
 }
 
+func (h *RoomMember) GetMyInvitations(c *gin.Context) {
+	userID, ok := currentUserID(c)
+	if !ok {
+		return
+	}
+	invitations, err := h.roomMemberService.GetMyInvitations(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not load invitations"})
+		return
+	}
+	c.JSON(http.StatusOK, invitations)
+}
+
 func (h *RoomMember) GetRoomDetail(c *gin.Context) {
 	userID, ok := currentUserID(c)
 	if !ok {
