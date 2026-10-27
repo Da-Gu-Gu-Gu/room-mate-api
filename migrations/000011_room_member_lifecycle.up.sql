@@ -21,7 +21,7 @@ WITH duplicates AS (
     FROM rooms
 )
 UPDATE rooms AS r
-SET room_code = UPPER(SUBSTRING(REPLACE(r.id::text, '-', '') FROM 1 FOR 8)),
+SET room_code = UPPER(REPLACE(r.id::text, '-', '')),
     updated_at = NOW()
 FROM duplicates AS d
 WHERE r.id = d.id AND d.code_count > 1;
