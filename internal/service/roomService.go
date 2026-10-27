@@ -40,6 +40,10 @@ func (s *RoomMemberService) GetRoomDetail(actorID, roomID uuid.UUID) ([]*model.R
 	return s.roomMemberRepository.GetRoomMembers(roomID)
 }
 
+func (s *RoomMemberService) GetMyInvitations(userID uuid.UUID) ([]*model.Invitation, error) {
+	return s.roomMemberRepository.GetMyInvitations(userID)
+}
+
 func (s *RoomMemberService) Invite(ctx context.Context, roomID, inviterID, inviteeID uuid.UUID) (*model.Invitation, error) {
 	invitation, err := s.roomMemberRepository.Invite(ctx, roomID, inviterID, inviteeID)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
