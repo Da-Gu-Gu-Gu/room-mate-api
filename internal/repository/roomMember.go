@@ -11,6 +11,7 @@ import (
 
 type RoomMemberRepository interface {
 	GetRoomMembers(id uuid.UUID) ([]*model.RoomMember, error)
+	GetMyInvitations(userID uuid.UUID) ([]*model.Invitation, error)
 	IsActiveMember(roomID, userID uuid.UUID) (bool, error)
 	Invite(ctx context.Context, roomID, inviterID, inviteeID uuid.UUID) (*model.Invitation, error)
 	RespondInvitation(ctx context.Context, invitationID, userID uuid.UUID, accept bool) error
@@ -35,4 +36,16 @@ func (r *roomMemberRepository) GetRoomMembers(id uuid.UUID) ([]*model.RoomMember
 		return nil, err
 	}
 	return members, nil
+}
+
+func (r *roomMemberRepository) GetMyInvitations(userID uuid.UUID) ([]*model.Invitation, error) {
+	var invitations []*model.Invitation
+	err := r.db.Preload("Room").
+		Where("invitee_id = ? AND status = ?", userID, model.InvitationPending).
+		Order("created_at DESC").
+		Find(&invitations).Error
+	if err != nil {
+		return nil, err
+	}
+	return invitations, nil
 }
