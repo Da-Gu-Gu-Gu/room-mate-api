@@ -2,9 +2,9 @@ package repository
 
 import (
 	"context"
-	"fmt"
-	"room-mate-api/internal/model"
 	"time"
+
+	"room-mate-api/internal/model"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -57,22 +57,30 @@ func (r *roomRepository) IsActiveMember(roomID, userID uuid.UUID) (bool, error) 
 
 func (r *roomRepository) Create(ctx context.Context, payload *model.Room) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Enforce one current room per user. The partial unique index in migration
+		// 000011 also protects against concurrent requests.
+		var activeCount int64
+		if err := tx.Model(&model.RoomMember{}).
+			Where("user_id = ? AND leave_at IS NULL", payload.CreatedBy).
+			Count(&activeCount).Error; err != nil {
+			return err
+		}
+		if activeCount > 0 {
+			return ErrAlreadyInRoom
+		}
+
 		if err := tx.Create(payload).Error; err != nil {
 			return err
 		}
 
-		joinedAt := time.Now()
-		roomMember := &model.RoomMember{
+		joinedAt := time.Now().UTC()
+		member := &model.RoomMember{
 			RoomID: payload.ID,
 			UserID: payload.CreatedBy,
-			Role: "owner",
+			Role: model.RoleAdmin,
 			JoinedAt: &joinedAt,
 		}
-		if err := tx.Create(roomMember).Error; err != nil {
-			fmt.Print(err)
-			return err
-		}
-		return nil
+		return tx.Create(member).Error
 	})
 }
 
