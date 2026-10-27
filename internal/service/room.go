@@ -2,11 +2,18 @@ package service
 
 import (
 	"context"
+	"errors"
 	"room-mate-api/internal/dto"
 	"room-mate-api/internal/model"
 	"room-mate-api/internal/repository"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
+)
+
+var (
+	ErrForbidden = errors.New("forbidden")
+	ErrNotFound = errors.New("resource not found")
 )
 
 type RoomService struct {
@@ -14,37 +21,39 @@ type RoomService struct {
 }
 
 func NewRoomService(roomRepo repository.RoomRepository) *RoomService {
-	return &RoomService{
-		roomRepository: roomRepo,
-	}
+	return &RoomService{roomRepository: roomRepo}
 }
 
 func (s *RoomService) CreateRoom(ctx context.Context, req *dto.RoomRequest) (*model.Room, error) {
-
 	roomModel := &model.Room{
-		RoomName:   req.RoomName,
+		RoomName: req.RoomName,
 		RoomNumber: req.RoomNumber,
-		CreatedBy:  req.CreatedBy,
-		RoomCode:   "232123", //generated random number 6
+		CreatedBy: req.CreatedBy,
+		RoomCode: "232123", // TODO: generate a unique room code.
 	}
-	err := s.roomRepository.Create(ctx, roomModel)
-	if err != nil {
+	if err := s.roomRepository.Create(ctx, roomModel); err != nil {
 		return nil, err
 	}
 	return roomModel, nil
 }
 
-func (s *RoomService) UpdateRoom(id uuid.UUID, req *dto.UpdateRoomRequest) (*model.Room, error) {
-	room, err := s.roomRepository.GETBYID(id)
+func (s *RoomService) UpdateRoom(actorID, roomID uuid.UUID, req *dto.UpdateRoomRequest) (*model.Room, error) {
+	room, err := s.roomRepository.GETBYID(roomID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrNotFound
+	}
 	if err != nil {
 		return nil, err
+	}
+	if room.CreatedBy != actorID {
+		return nil, ErrForbidden
 	}
 
 	if req.RoomName != nil {
 		room.RoomName = *req.RoomName
 	}
 	if req.RoomNumber != nil {
-		room.RoomName = *req.RoomNumber
+		room.RoomNumber = *req.RoomNumber
 	}
 	if err := s.roomRepository.UPDATE(room); err != nil {
 		return nil, err
@@ -53,25 +62,37 @@ func (s *RoomService) UpdateRoom(id uuid.UUID, req *dto.UpdateRoomRequest) (*mod
 }
 
 func (s *RoomService) GetRoom() ([]*model.Room, error) {
-	rooms, err := s.roomRepository.GET()
+	return s.roomRepository.GET()
+}
+
+func (s *RoomService) GetRoomById(actorID, roomID uuid.UUID) (*model.Room, error) {
+	room, err := s.roomRepository.GETBYID(roomID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrNotFound
+	}
 	if err != nil {
 		return nil, err
 	}
-	return rooms, nil
-}
-
-func (s *RoomService) GetRoomById(id uuid.UUID) (*model.Room, error) {
-	room, err := s.roomRepository.GETBYID(id)
+	isMember, err := s.roomRepository.IsActiveMember(roomID, actorID)
 	if err != nil {
 		return nil, err
+	}
+	if !isMember {
+		return nil, ErrForbidden
 	}
 	return room, nil
 }
 
-func (s *RoomService) DeleteRoom(id uuid.UUID) error {
-	err := s.roomRepository.DELETE(id)
+func (s *RoomService) DeleteRoom(actorID, roomID uuid.UUID) error {
+	room, err := s.roomRepository.GETBYID(roomID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return ErrNotFound
+	}
 	if err != nil {
 		return err
 	}
-	return nil
+	if room.CreatedBy != actorID {
+		return ErrForbidden
+	}
+	return s.roomRepository.DELETE(roomID)
 }
