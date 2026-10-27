@@ -16,6 +16,7 @@ type RoomMemberRepository interface {
 	Invite(ctx context.Context, roomID, inviterID, inviteeID uuid.UUID) (*model.Invitation, error)
 	RespondInvitation(ctx context.Context, invitationID, userID uuid.UUID, accept bool) error
 	LeaveRoom(ctx context.Context, roomID, userID uuid.UUID) error
+	TransferOwnership(ctx context.Context, roomID, ownerID, newOwnerID uuid.UUID) error
 }
 
 type roomMemberRepository struct {
