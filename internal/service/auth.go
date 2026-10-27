@@ -15,14 +15,16 @@ import (
 
 type AuthService struct {
 	googleAuth *GoogleAuthService
+	appleAuth  *AppleAuthService
 	authRepo   repository.AuthRepo
 	jwtSecret  string
 	db         *gorm.DB
 }
 
-func NewAuthService(googleAuth *GoogleAuthService, authRepo repository.AuthRepo, jwtSecret string, db *gorm.DB) *AuthService {
+func NewAuthService(googleAuth *GoogleAuthService, appleAuth *AppleAuthService, authRepo repository.AuthRepo, jwtSecret string, db *gorm.DB) *AuthService {
 	return &AuthService{
 		googleAuth: googleAuth,
+		appleAuth:  appleAuth,
 		authRepo:   authRepo,
 		jwtSecret:  jwtSecret,
 		db:         db,
@@ -84,6 +86,66 @@ func (s *AuthService) LoginWithGoogle(ctx context.Context, rawToken string) (*mo
 	}
 
 	// 4. Issue a Room Mate API JWT.
+	accessToken, err := s.createAccessToken(user)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return user, accessToken, nil
+
+}
+
+func (s *AuthService) LoginWithApple(ctx context.Context, rawToken string) (*model.User, string, error) {
+	appleUserInfo, err := s.appleAuth.GetAppleUserInfo(ctx, rawToken)
+	if err != nil {
+		return nil, "", err
+	}
+	if appleUserInfo.Email == "" || !appleUserInfo.EmailVerified {
+		return nil, "", errors.New("Apple account must have a verified email")
+	}
+	// check already register or not
+	existingUser, err := s.authRepo.FindByProvider("apple", appleUserInfo.ProviderUserID)
+	var user *model.User
+	if err == nil {
+		// Returning user.
+		user = &existingUser.User
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, "", fmt.Errorf(
+			"find auth identity: %w", err,
+		)
+	} else {
+		user = &model.User{
+			Email:      appleUserInfo.Email,
+			ProfileUrl: appleUserInfo.ProfileURL,
+			Name:       appleUserInfo.Name,
+		}
+		err = s.db.WithContext(ctx).Transaction(
+			func(tx *gorm.DB) error {
+				txUserRepo := repository.NewUserRepository(tx)
+				txIdentityRepo := repository.NewAuthRepo(tx)
+
+				if err := txUserRepo.Create(user); err != nil {
+					return err
+				}
+				var authIdenties = &model.AuthIdentity{
+					Provider:       "apple",
+					ProviderUserId: appleUserInfo.ProviderUserID,
+					UserId:         user.ID,
+				}
+
+				if err := txIdentityRepo.Create(authIdenties); err != nil {
+					return err
+				}
+				return nil
+			})
+	}
+
+	if err != nil {
+		return nil, "", fmt.Errorf(
+			"register Apple user: %w", err,
+		)
+	}
+
 	accessToken, err := s.createAccessToken(user)
 	if err != nil {
 		return nil, "", err

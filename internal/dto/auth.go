@@ -17,3 +17,11 @@ type AuthResponse struct {
 	TokenType   string
 	User        UserResponse
 }
+
+type AppleUserInfo struct {
+	ProviderUserID string
+	Email          string
+	Name           string
+	ProfileURL     string
+	EmailVerified  bool
+}

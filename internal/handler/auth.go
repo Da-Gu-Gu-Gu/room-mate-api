@@ -54,3 +54,32 @@ func (h *AuthHandler) GoogleLogin(c *gin.Context) {
 		},
 	})
 }
+
+func (h *AuthHandler) LoginWithApple(c *gin.Context) {
+	ctx := c.Request.Context()
+	var rawToken dto.SocialLoginRequest
+	err := c.ShouldBindJSON(&rawToken)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid request body",
+		})
+		return
+	}
+	user, accessToken, err := h.authService.LoginWithApple(ctx, rawToken.IdToken)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+	c.JSON(http.StatusOK, dto.AuthResponse{
+		AccessToken: accessToken,
+		TokenType:   "Bearer",
+		User: dto.UserResponse{
+			ID:         user.ID,
+			Email:      user.Email,
+			ProfileUrl: user.ProfileUrl,
+			Name:       user.Name,
+		},
+	})
+}

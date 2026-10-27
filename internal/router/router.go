@@ -31,12 +31,17 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	if err != nil {
 		log.Fatal(err)
 	}
+	appleAuth, err := service.NewAppleAuthService(cfg.AppleClientId)
+	if err != nil {
+		log.Fatal(err)
+	}
 	authIdentityRepo := repository.NewAuthRepo(db)
-	authService := service.NewAuthService(googleAuth, authIdentityRepo, cfg.JWTSecret, db)
+	authService := service.NewAuthService(googleAuth, appleAuth, authIdentityRepo, cfg.JWTSecret, db)
 	authHandler := handler.NewAuthHandler(authService)
 
 	api := router.Group("/api/v1")
 	api.POST("/auth/google", authHandler.GoogleLogin)
+	api.POST("/auth/apple", authHandler.LoginWithApple)
 
 	protected := api.Group("")
 	protected.Use(middleware.AuthMiddleware(cfg.JWTSecret))
