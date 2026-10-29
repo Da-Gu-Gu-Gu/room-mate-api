@@ -2,6 +2,7 @@ package router
 
 import (
 	"log"
+
 	"room-mate-api/internal/config"
 	"room-mate-api/internal/handler"
 	"room-mate-api/internal/middleware"
@@ -26,6 +27,10 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	roomRepository := repository.NewRoomRepository(db)
 	roomService := service.NewRoomService(roomRepository)
 	roomHandler := handler.NewRoomHandler(roomService)
+
+	roomMemberRepository := repository.NewRoomMemberRepository(db)
+	roomMemberService := service.NewRoomMemberService(roomMemberRepository)
+	roomMemberHandler := handler.NewRoomMemberHandler(roomMemberService)
 
 	googleAuth, err := service.NewGoogleAuthService(cfg.GoogleClientId)
 	if err != nil {
@@ -57,8 +62,6 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			user.GET("/theme", userHandler.GetUserTheme)
 		}
 
-		// Theme catalog is readable by authenticated users. Mutating global themes
-		// is intentionally not exposed here; it should be an admin-only API.
 		theme := protected.Group("/themes")
 		theme.GET("", themeHandler.GetThemes)
 
@@ -68,7 +71,15 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			room.PUT("/:id", roomHandler.UpdateRoom)
 			room.GET("/:id", roomHandler.GetRoomById)
 			room.DELETE("/:id", roomHandler.DeleteRoom)
+			room.GET("/:id/members", roomMemberHandler.GetRoomDetail)
+			room.POST("/:id/invitations", roomMemberHandler.Invite)
+			room.POST("/:id/transfer-ownership", roomMemberHandler.TransferOwnership)
+			room.POST("/:id/leave", roomMemberHandler.LeaveRoom)
 		}
+
+		protected.GET("/invitations", roomMemberHandler.GetMyInvitations)
+		protected.POST("/invitations/:invitationId/accept", roomMemberHandler.AcceptInvitation)
+		protected.POST("/invitations/:invitationId/decline", roomMemberHandler.DeclineInvitation)
 	}
 
 	router.GET("/hello", func(c *gin.Context) {

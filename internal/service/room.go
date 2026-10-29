@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+
 	"room-mate-api/internal/dto"
 	"room-mate-api/internal/model"
 	"room-mate-api/internal/repository"
@@ -25,16 +26,16 @@ func NewRoomService(roomRepo repository.RoomRepository) *RoomService {
 }
 
 func (s *RoomService) CreateRoom(ctx context.Context, req *dto.RoomRequest) (*model.Room, error) {
-	roomModel := &model.Room{
+	room := &model.Room{
 		RoomName: req.RoomName,
 		RoomNumber: req.RoomNumber,
 		CreatedBy: req.CreatedBy,
-		RoomCode: "232123", // TODO: generate a unique room code.
+		RoomCode: uuid.NewString()[:8],
 	}
-	if err := s.roomRepository.Create(ctx, roomModel); err != nil {
+	if err := s.roomRepository.Create(ctx, room); err != nil {
 		return nil, err
 	}
-	return roomModel, nil
+	return room, nil
 }
 
 func (s *RoomService) UpdateRoom(actorID, roomID uuid.UUID, req *dto.UpdateRoomRequest) (*model.Room, error) {
