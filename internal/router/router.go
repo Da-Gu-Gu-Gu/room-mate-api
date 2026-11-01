@@ -33,6 +33,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	roomMemberHandler := handler.NewRoomMemberHandler(roomMemberService)
 
 	googleAuth, err := service.NewGoogleAuthService(cfg.GoogleClientId)
+
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -43,6 +44,10 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	authIdentityRepo := repository.NewAuthRepo(db)
 	authService := service.NewAuthService(googleAuth, appleAuth, authIdentityRepo, cfg.JWTSecret, db)
 	authHandler := handler.NewAuthHandler(authService)
+
+	billRepository := repository.NewBillRepository(db)
+	billService := service.NewBillService(billRepository)
+	billHandler := handler.NewBillHandler(billService)
 
 	api := router.Group("/api/v1")
 	api.POST("/auth/google", authHandler.GoogleLogin)
@@ -77,9 +82,13 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			room.POST("/:id/leave", roomMemberHandler.LeaveRoom)
 		}
 
+		// room-invitation
 		protected.GET("/invitations", roomMemberHandler.GetMyInvitations)
 		protected.POST("/invitations/:invitationId/accept", roomMemberHandler.AcceptInvitation)
 		protected.POST("/invitations/:invitationId/decline", roomMemberHandler.DeclineInvitation)
+
+		//bill-categories
+		protected.GET("/bill-categories", billHandler.GetBillCategories)
 	}
 
 	router.GET("/hello", func(c *gin.Context) {
