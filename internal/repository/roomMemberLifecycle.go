@@ -13,15 +13,15 @@ import (
 )
 
 var (
-	ErrRoomMemberForbidden = errors.New("room member action forbidden")
-	ErrAlreadyInRoom = errors.New("user already belongs to an active room")
+	ErrRoomMemberForbidden     = errors.New("room member action forbidden")
+	ErrAlreadyInRoom           = errors.New("user already belongs to an active room")
 	ErrPendingInvitationExists = errors.New("a pending invitation already exists")
-	ErrInvitationNotFound = errors.New("invitation not found")
-	ErrInvitationNotPending = errors.New("invitation is no longer pending")
-	ErrOwnerCannotLeave = errors.New("room owner must transfer ownership before leaving")
-	ErrCannotTransferToSelf = errors.New("cannot transfer ownership to yourself")
-	ErrTargetNotActiveMember = errors.New("new owner must be an active member of the room")
-	ErrNotActiveRoomMember = errors.New("user is not an active member of this room")
+	ErrInvitationNotFound      = errors.New("invitation not found")
+	ErrInvitationNotPending    = errors.New("invitation is no longer pending")
+	ErrOwnerCannotLeave        = errors.New("room owner must transfer ownership before leaving")
+	ErrCannotTransferToSelf    = errors.New("cannot transfer ownership to yourself")
+	ErrTargetNotActiveMember   = errors.New("new owner must be an active member of the room")
+	ErrNotActiveRoomMember     = errors.New("user is not an active member of this room")
 )
 
 func (r *roomMemberRepository) IsActiveMember(roomID, userID uuid.UUID) (bool, error) {
@@ -119,9 +119,9 @@ func (r *roomMemberRepository) RespondInvitation(ctx context.Context, invitation
 
 			joinedAt := time.Now().UTC()
 			member := model.RoomMember{
-				RoomID: invitation.RoomID,
-				UserID: userID,
-				Role: model.RoleMember,
+				RoomID:   invitation.RoomID,
+				UserID:   userID,
+				Role:     model.RoleMember,
 				JoinedAt: &joinedAt,
 			}
 			if err := tx.Create(&member).Error; err != nil {
@@ -132,7 +132,7 @@ func (r *roomMemberRepository) RespondInvitation(ctx context.Context, invitation
 			invitation.Status = model.InvitationDeclined
 		}
 		return tx.Model(&invitation).Updates(map[string]interface{}{
-			"status": invitation.Status,
+			"status":     invitation.Status,
 			"updated_at": time.Now().UTC(),
 		}).Error
 	})
@@ -155,12 +155,11 @@ func (r *roomMemberRepository) LeaveRoom(ctx context.Context, roomID, userID uui
 		}
 		now := time.Now().UTC()
 		return tx.Model(&member).Updates(map[string]interface{}{
-			"leave_at": now,
+			"leave_at":   now,
 			"updated_at": now,
 		}).Error
 	})
 }
-
 
 func (r *roomMemberRepository) TransferOwnership(ctx context.Context, roomID, ownerID, newOwnerID uuid.UUID) error {
 	if ownerID == newOwnerID {
@@ -203,13 +202,13 @@ func (r *roomMemberRepository) TransferOwnership(ctx context.Context, roomID, ow
 
 		now := time.Now().UTC()
 		if err := tx.Model(&nextOwner).Updates(map[string]interface{}{
-			"role": model.RoleAdmin,
+			"role":       model.RoleAdmin,
 			"updated_at": now,
 		}).Error; err != nil {
 			return err
 		}
 		if err := tx.Model(&currentOwner).Updates(map[string]interface{}{
-			"role": model.RoleMember,
+			"role":       model.RoleMember,
 			"updated_at": now,
 		}).Error; err != nil {
 			return err
