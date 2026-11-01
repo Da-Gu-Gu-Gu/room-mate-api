@@ -14,7 +14,7 @@ import (
 
 var (
 	ErrForbidden = errors.New("forbidden")
-	ErrNotFound = errors.New("resource not found")
+	ErrNotFound  = errors.New("resource not found")
 )
 
 type RoomService struct {
@@ -27,10 +27,10 @@ func NewRoomService(roomRepo repository.RoomRepository) *RoomService {
 
 func (s *RoomService) CreateRoom(ctx context.Context, req *dto.RoomRequest) (*model.Room, error) {
 	room := &model.Room{
-		RoomName: req.RoomName,
+		RoomName:   req.RoomName,
 		RoomNumber: req.RoomNumber,
-		CreatedBy: req.CreatedBy,
-		RoomCode: uuid.NewString()[:8],
+		CreatedBy:  req.CreatedBy,
+		RoomCode:   uuid.NewString()[:8],
 	}
 	if err := s.roomRepository.Create(ctx, room); err != nil {
 		return nil, err
@@ -74,7 +74,7 @@ func (s *RoomService) GetRoomById(actorID, roomID uuid.UUID) (*model.Room, error
 	if err != nil {
 		return nil, err
 	}
-	isMember, err := s.roomRepository.IsActiveMember(roomID, actorID)
+	isMember, err := s.roomRepository.IsActiveMember(roomID, actorID) //check still user still in the room
 	if err != nil {
 		return nil, err
 	}
