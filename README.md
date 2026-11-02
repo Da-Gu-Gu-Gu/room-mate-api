@@ -2,6 +2,43 @@
 
 Go API for the Room Mate household cost-sharing app.
 
+## Room bill receipt images
+
+Room bill creation accepts either the existing JSON request (without an image) or `multipart/form-data` with an optional `receiptImage` file.
+
+Multipart fields:
+- `categoryId` (required UUID)
+- `name` (required)
+- `total` (required, greater than zero)
+- `description` (optional)
+- `dueDate` (optional, `YYYY-MM-DD` or RFC3339)
+- `receiptImage` (optional JPEG, PNG, or WebP; maximum 5 MB)
+
+Example:
+
+```bash
+curl -X POST "http://localhost:8080/api/v1/rooms/<room-id>/bills" \
+  -H "Authorization: Bearer <access-token>" \
+  -F "categoryId=<category-id>" \
+  -F "name=Electricity bill" \
+  -F "total=1200" \
+  -F "dueDate=2026-11-15" \
+  -F "receiptImage=@./electricity-receipt.jpg"
+```
+
+Set these environment variables to enable receipt uploads:
+
+```env
+AWS_REGION=ap-southeast-1
+AWS_S3_BUCKET=your-private-room-mate-bucket
+```
+
+The AWS SDK uses its standard credential chain (for local development, configure the AWS CLI profile or `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`; in production, prefer an IAM role). Keep the bucket private and Block Public Access enabled. The app needs `s3:PutObject`, `s3:GetObject`, and `s3:DeleteObject` permissions for the `room-bills/*` object prefix.
+
+The API validates the image bytes, limits uploads to 5 MB, stores the S3 object key in PostgreSQL, and returns a private presigned GET URL that expires after 10 minutes. Room membership is checked before upload. If saving the bill fails after the upload, the service attempts to delete the uploaded object.
+
+Apply migration `000013_room_bill_receipt_image.up.sql` after the existing room-bill migrations. Run `go mod tidy` after pulling the AWS SDK dependencies to update `go.sum`.
+
 ## Room membership lifecycle
 
 All endpoints below require a valid access token.
