@@ -20,7 +20,7 @@ var ErrRoomBillStorageUnavailable = errors.New("room bill image storage is not c
 type RoomBillObjectStorage interface {
 	Upload(ctx context.Context, key string, body io.Reader, contentType string) error
 	Delete(ctx context.Context, key string) error
-	PresignGet(ctx context.Context, key string) (string, error)
+	PublicURL(key string) string
 }
 
 type RoomBillService struct {
@@ -29,27 +29,16 @@ type RoomBillService struct {
 }
 
 func NewRoomBillService(roomBillRepo repository.RoomBillRepository, objectStorage RoomBillObjectStorage) *RoomBillService {
-	return &RoomBillService{
-		roomBillRepository: roomBillRepo,
-		objectStorage:      objectStorage,
-	}
+	return &RoomBillService{roomBillRepository: roomBillRepo, objectStorage: objectStorage}
 }
 
 func (s *RoomBillService) CreateRoomBill(req *dto.RoomBillRequest, receiptImage []byte, contentType, extension string) (*model.RoomBill, error) {
 	roomBill := &model.RoomBill{
-		ID:          uuid.New(),
-		RoomId:      req.RoomID,
-		CategoryId:  req.CategoryID,
-		Name:        req.Name,
-		Description: req.Description,
-		Total:       req.Total,
-		Status:      "pending",
-		DueDate:     req.DueDate,
-		CreatedBy:   req.CreatedBy,
+		ID: uuid.New(), RoomId: req.RoomID, CategoryId: req.CategoryID,
+		Name: req.Name, Description: req.Description, Total: req.Total,
+		Status: "pending", DueDate: req.DueDate, CreatedBy: req.CreatedBy,
 	}
 
-	// Check room access before uploading anything to S3. Create() checks again
-	// immediately before inserting the row.
 	if err := s.roomBillRepository.CanCreate(req.RoomID, req.CreatedBy); err != nil {
 		return nil, err
 	}
@@ -58,11 +47,9 @@ func (s *RoomBillService) CreateRoomBill(req *dto.RoomBillRequest, receiptImage 
 		if s.objectStorage == nil {
 			return nil, ErrRoomBillStorageUnavailable
 		}
-
 		key := fmt.Sprintf("room-bills/%s/%s/receipt.%s", req.RoomID, roomBill.ID, extension)
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-
 		if err := s.objectStorage.Upload(ctx, key, bytes.NewReader(receiptImage), contentType); err != nil {
 			return nil, err
 		}
@@ -78,10 +65,7 @@ func (s *RoomBillService) CreateRoomBill(req *dto.RoomBillRequest, receiptImage 
 		}
 		return nil, err
 	}
-
-	// The bill is already persisted. If signing the preview URL fails, do not
-	// report the creation as failed; the next GET can generate a fresh URL.
-	_ = s.addReceiptImageURL(createdRoomBill)
+	s.addReceiptImageURL(createdRoomBill)
 	return createdRoomBill, nil
 }
 
@@ -91,9 +75,7 @@ func (s *RoomBillService) GetRoomBills(roomID, userID uuid.UUID) ([]*model.RoomB
 		return nil, err
 	}
 	for _, bill := range bills {
-		if err := s.addReceiptImageURL(bill); err != nil {
-			return nil, err
-		}
+		s.addReceiptImageURL(bill)
 	}
 	return bills, nil
 }
@@ -103,37 +85,21 @@ func (s *RoomBillService) GetRoomBillByID(roomID, billID, userID uuid.UUID) (*mo
 	if err != nil {
 		return nil, err
 	}
-	if err := s.addReceiptImageURL(bill); err != nil {
-		return nil, err
-	}
+	s.addReceiptImageURL(bill)
 	return bill, nil
 }
 
-func (s *RoomBillService) addReceiptImageURL(bill *model.RoomBill) error {
-	if bill.ReceiptImageKey == nil || *bill.ReceiptImageKey == "" {
-		return nil
+func (s *RoomBillService) addReceiptImageURL(bill *model.RoomBill) {
+	if bill.ReceiptImageKey == nil || *bill.ReceiptImageKey == "" || s.objectStorage == nil {
+		return
 	}
-	if s.objectStorage == nil {
-		return ErrRoomBillStorageUnavailable
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	url, err := s.objectStorage.PresignGet(ctx, *bill.ReceiptImageKey)
-	if err != nil {
-		return err
-	}
-	bill.ReceiptImageURL = url
-	return nil
+	bill.ReceiptImageURL = s.objectStorage.PublicURL(*bill.ReceiptImageKey)
 }
 
 func (s *RoomBillService) CreateRoomBillShares(roomID, billID, requesterID uuid.UUID, req *dto.CreateRoomBillSharesRequest) ([]*model.RoomBillShare, error) {
 	shares := make([]model.RoomBillShare, 0, len(req.Members))
 	for _, member := range req.Members {
-		shares = append(shares, model.RoomBillShare{
-			UserID: member.UserID,
-			Amount: member.Amount,
-		})
+		shares = append(shares, model.RoomBillShare{UserID: member.UserID, Amount: member.Amount})
 	}
 	return s.roomBillRepository.CreateShares(roomID, billID, requesterID, shares)
 }
