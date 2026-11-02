@@ -43,9 +43,20 @@ func (s *RoomBillService) GetRoomBills(roomID, userID uuid.UUID) ([]*model.RoomB
 }
 
 func (s *RoomBillService) GetRoomBillByID(roomID, billID, userID uuid.UUID) (*model.RoomBill, error) {
-	bills, err := s.roomBillRepository.GetRoomBillById(roomID, userID, billID)
+	bill, err := s.roomBillRepository.GetRoomBillById(roomID, userID, billID)
 	if err != nil {
 		return nil, err
 	}
-	return bills, nil
+	return bill, nil
+}
+
+func (s *RoomBillService) CreateRoomBillShares(roomID, billID, requesterID uuid.UUID, req *dto.CreateRoomBillSharesRequest) ([]*model.RoomBillShare, error) {
+	shares := make([]model.RoomBillShare, 0, len(req.Members))
+	for _, member := range req.Members {
+		shares = append(shares, model.RoomBillShare{
+			UserID: member.UserID,
+			Amount: member.Amount,
+		})
+	}
+	return s.roomBillRepository.CreateShares(roomID, billID, requesterID, shares)
 }
