@@ -17,6 +17,7 @@ var (
 	ErrRoomBillShareForbidden = errors.New("user is not an active member of this room")
 	ErrRoomBillShareTotal     = errors.New("assigned share amounts must equal the bill total")
 	ErrInvalidRoomBillShares  = errors.New("room bill shares contain duplicate users or invalid amounts")
+	ErrRoomBillSharesAlreadyAssigned = errors.New("shares have already been assigned for this bill")
 )
 
 type RoomBillRepository interface {
@@ -155,7 +156,7 @@ func (r *roomBillRepository) CreateShares(roomID, billID, requesterID uuid.UUID,
 			return err
 		}
 		if existingCount > 0 {
-			return errors.New("shares have already been assigned for this bill")
+			return ErrRoomBillSharesAlreadyAssigned
 		}
 
 		// Save each member's share individually. The surrounding transaction
