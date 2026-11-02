@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"time"
+	"net/url"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
@@ -12,9 +12,9 @@ import (
 )
 
 type S3Storage struct {
-	client        *s3.Client
-	presignClient *s3.PresignClient
-	bucket        string
+	client *s3.Client
+	bucket string
+	region string
 }
 
 func NewS3Storage(ctx context.Context, region, bucket string) (*S3Storage, error) {
@@ -27,11 +27,10 @@ func NewS3Storage(ctx context.Context, region, bucket string) (*S3Storage, error
 		return nil, fmt.Errorf("load AWS configuration: %w", err)
 	}
 
-	client := s3.NewFromConfig(cfg)
 	return &S3Storage{
-		client:        client,
-		presignClient: s3.NewPresignClient(client),
-		bucket:        bucket,
+		client: s3.NewFromConfig(cfg),
+		bucket: bucket,
+		region: region,
 	}, nil
 }
 
@@ -59,13 +58,13 @@ func (s *S3Storage) Delete(ctx context.Context, key string) error {
 	return nil
 }
 
-func (s *S3Storage) PresignGet(ctx context.Context, key string) (string, error) {
-	result, err := s.presignClient.PresignGetObject(ctx, &s3.GetObjectInput{
-		Bucket: aws.String(s.bucket),
-		Key:    aws.String(key),
-	}, s3.WithPresignExpires(10*time.Minute))
-	if err != nil {
-		return "", fmt.Errorf("create S3 download URL: %w", err)
+// PublicURL returns a stable S3 object URL. The bucket policy must allow
+// s3:GetObject for the room-bills/* prefix.
+func (s *S3Storage) PublicURL(key string) string {
+	objectURL := url.URL{
+		Scheme: "https",
+		Host:   fmt.Sprintf("%s.s3.%s.amazonaws.com", s.bucket, s.region),
+		Path:   "/" + key,
 	}
-	return result.URL, nil
+	return objectURL.String()
 }
