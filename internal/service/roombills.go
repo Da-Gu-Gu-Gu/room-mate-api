@@ -66,15 +66,15 @@ func (s *RoomBillService) CreateRoomBill(req *dto.RoomBillRequest, receiptImage 
 		if err := s.objectStorage.Upload(ctx, key, bytes.NewReader(receiptImage), contentType); err != nil {
 			return nil, err
 		}
-		roomBill.ReceiptImageKey = key
+		roomBill.ReceiptImageKey = &key
 	}
 
 	createdRoomBill, err := s.roomBillRepository.Create(roomBill)
 	if err != nil {
-		if roomBill.ReceiptImageKey != "" && s.objectStorage != nil {
+		if roomBill.ReceiptImageKey != nil && s.objectStorage != nil {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-			_ = s.objectStorage.Delete(ctx, roomBill.ReceiptImageKey)
+			_ = s.objectStorage.Delete(ctx, *roomBill.ReceiptImageKey)
 		}
 		return nil, err
 	}
@@ -110,7 +110,7 @@ func (s *RoomBillService) GetRoomBillByID(roomID, billID, userID uuid.UUID) (*mo
 }
 
 func (s *RoomBillService) addReceiptImageURL(bill *model.RoomBill) error {
-	if bill.ReceiptImageKey == "" {
+	if bill.ReceiptImageKey == nil || *bill.ReceiptImageKey == "" {
 		return nil
 	}
 	if s.objectStorage == nil {
@@ -119,7 +119,7 @@ func (s *RoomBillService) addReceiptImageURL(bill *model.RoomBill) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	url, err := s.objectStorage.PresignGet(ctx, bill.ReceiptImageKey)
+	url, err := s.objectStorage.PresignGet(ctx, *bill.ReceiptImageKey)
 	if err != nil {
 		return err
 	}
