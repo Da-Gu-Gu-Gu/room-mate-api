@@ -48,6 +48,12 @@ func (s *RoomBillService) CreateRoomBill(req *dto.RoomBillRequest, receiptImage 
 		CreatedBy:   req.CreatedBy,
 	}
 
+	// Check room access before uploading anything to S3. Create() checks again
+	// immediately before inserting the row.
+	if err := s.roomBillRepository.CanCreate(req.RoomID, req.CreatedBy); err != nil {
+		return nil, err
+	}
+
 	if len(receiptImage) > 0 {
 		if s.objectStorage == nil {
 			return nil, ErrRoomBillStorageUnavailable
@@ -73,9 +79,9 @@ func (s *RoomBillService) CreateRoomBill(req *dto.RoomBillRequest, receiptImage 
 		return nil, err
 	}
 
-	if err := s.addReceiptImageURL(createdRoomBill); err != nil {
-		return nil, err
-	}
+	// The bill is already persisted. If signing the preview URL fails, do not
+	// report the creation as failed; the next GET can generate a fresh URL.
+	_ = s.addReceiptImageURL(createdRoomBill)
 	return createdRoomBill, nil
 }
 
