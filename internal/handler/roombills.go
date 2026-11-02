@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"room-mate-api/internal/dto"
+	"room-mate-api/internal/repository"
 	"room-mate-api/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -111,7 +113,18 @@ func (h *RoomBillHandler) CreateRoomBillShares(c *gin.Context) {
 
 	shares, err := h.roomBillService.CreateRoomBillShares(roomID, billID, requesterID, &req)
 	if err != nil {
-		respondRoomError(c, err)
+		switch {
+		case errors.Is(err, repository.ErrRoomBillNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": "room bill not found"})
+		case errors.Is(err, repository.ErrRoomBillShareForbidden):
+			c.JSON(http.StatusForbidden, gin.H{"error": "you or one of the selected users is not an active member of this room"})
+		case errors.Is(err, repository.ErrRoomBillShareTotal), errors.Is(err, repository.ErrInvalidRoomBillShares):
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		case errors.Is(err, repository.ErrRoomBillSharesAlreadyAssigned):
+			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		}
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"members": shares})
