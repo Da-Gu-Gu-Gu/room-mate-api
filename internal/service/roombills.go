@@ -1,6 +1,13 @@
 package service
 
 import (
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"time"
+
 	"room-mate-api/internal/dto"
 	"room-mate-api/internal/model"
 	"room-mate-api/internal/repository"
@@ -8,27 +15,65 @@ import (
 	"github.com/google/uuid"
 )
 
+var ErrRoomBillStorageUnavailable = errors.New("room bill image storage is not configured")
+
+type RoomBillObjectStorage interface {
+	Upload(ctx context.Context, key string, body io.Reader, contentType string) error
+	Delete(ctx context.Context, key string) error
+	PresignGet(ctx context.Context, key string) (string, error)
+}
+
 type RoomBillService struct {
 	roomBillRepository repository.RoomBillRepository
+	objectStorage      RoomBillObjectStorage
 }
 
-func NewRoomBillService(roomBillRepo repository.RoomBillRepository) *RoomBillService {
-	return &RoomBillService{roomBillRepository: roomBillRepo}
+func NewRoomBillService(roomBillRepo repository.RoomBillRepository, objectStorage RoomBillObjectStorage) *RoomBillService {
+	return &RoomBillService{
+		roomBillRepository: roomBillRepo,
+		objectStorage:      objectStorage,
+	}
 }
 
-func (s *RoomBillService) CreateRoomBill(req *dto.RoomBillRequest) (*model.RoomBill, error) {
+func (s *RoomBillService) CreateRoomBill(req *dto.RoomBillRequest, receiptImage []byte, contentType, extension string) (*model.RoomBill, error) {
 	roomBill := &model.RoomBill{
+		ID:          uuid.New(),
 		RoomId:      req.RoomID,
 		CategoryId:  req.CategoryID,
 		Name:        req.Name,
 		Description: req.Description,
 		Total:       req.Total,
-		Status:      "pending", // Default status
+		Status:      "pending",
 		DueDate:     req.DueDate,
 		CreatedBy:   req.CreatedBy,
 	}
+
+	if len(receiptImage) > 0 {
+		if s.objectStorage == nil {
+			return nil, ErrRoomBillStorageUnavailable
+		}
+
+		key := fmt.Sprintf("room-bills/%s/%s/receipt.%s", req.RoomID, roomBill.ID, extension)
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		if err := s.objectStorage.Upload(ctx, key, bytes.NewReader(receiptImage), contentType); err != nil {
+			return nil, err
+		}
+		roomBill.ReceiptImageKey = key
+	}
+
 	createdRoomBill, err := s.roomBillRepository.Create(roomBill)
 	if err != nil {
+		if roomBill.ReceiptImageKey != "" && s.objectStorage != nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			_ = s.objectStorage.Delete(ctx, roomBill.ReceiptImageKey)
+		}
+		return nil, err
+	}
+
+	if err := s.addReceiptImageURL(createdRoomBill); err != nil {
 		return nil, err
 	}
 	return createdRoomBill, nil
@@ -39,6 +84,11 @@ func (s *RoomBillService) GetRoomBills(roomID, userID uuid.UUID) ([]*model.RoomB
 	if err != nil {
 		return nil, err
 	}
+	for _, bill := range bills {
+		if err := s.addReceiptImageURL(bill); err != nil {
+			return nil, err
+		}
+	}
 	return bills, nil
 }
 
@@ -47,7 +97,28 @@ func (s *RoomBillService) GetRoomBillByID(roomID, billID, userID uuid.UUID) (*mo
 	if err != nil {
 		return nil, err
 	}
+	if err := s.addReceiptImageURL(bill); err != nil {
+		return nil, err
+	}
 	return bill, nil
+}
+
+func (s *RoomBillService) addReceiptImageURL(bill *model.RoomBill) error {
+	if bill.ReceiptImageKey == "" {
+		return nil
+	}
+	if s.objectStorage == nil {
+		return ErrRoomBillStorageUnavailable
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	url, err := s.objectStorage.PresignGet(ctx, bill.ReceiptImageKey)
+	if err != nil {
+		return err
+	}
+	bill.ReceiptImageURL = url
+	return nil
 }
 
 func (s *RoomBillService) CreateRoomBillShares(roomID, billID, requesterID uuid.UUID, req *dto.CreateRoomBillSharesRequest) ([]*model.RoomBillShare, error) {
