@@ -1,6 +1,7 @@
 package router
 
 import (
+	"context"
 	"log"
 
 	"room-mate-api/internal/config"
@@ -8,6 +9,7 @@ import (
 	"room-mate-api/internal/middleware"
 	"room-mate-api/internal/repository"
 	"room-mate-api/internal/service"
+	"room-mate-api/internal/storage"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -48,8 +50,17 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	billService := service.NewBillService(billRepository)
 	billHandler := handler.NewBillHandler(billService)
 
+	var roomBillStorage service.RoomBillObjectStorage
+	if cfg.AWSRegion != "" && cfg.AWSS3Bucket != "" {
+		s3Storage, err := storage.NewS3Storage(context.Background(), cfg.AWSRegion, cfg.AWSS3Bucket)
+		if err != nil {
+			log.Fatal(err)
+		}
+		roomBillStorage = s3Storage
+	}
+
 	roomBillRepository := repository.NewRoomBillRepository(db)
-	roomBillService := service.NewRoomBillService(roomBillRepository)
+	roomBillService := service.NewRoomBillService(roomBillRepository, roomBillStorage)
 	roomBillHandler := handler.NewRoomBillHandler(roomBillService)
 
 	api := router.Group("/api/v1")
