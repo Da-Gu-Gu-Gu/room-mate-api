@@ -21,6 +21,7 @@ var (
 )
 
 type RoomBillRepository interface {
+	CanCreate(roomID, userID uuid.UUID) error
 	Create(roomBill *model.RoomBill) (*model.RoomBill, error)
 	GetRoomBills(roomID, userID uuid.UUID) ([]*model.RoomBill, error)
 	GetRoomBillById(roomID, userID, billID uuid.UUID) (*model.RoomBill, error)
@@ -46,13 +47,20 @@ func (r *roomBillRepository) isBelongToRoom(roomID, userID uuid.UUID) (bool, err
 	return count > 0, nil
 }
 
-func (r *roomBillRepository) Create(roomBill *model.RoomBill) (*model.RoomBill, error) {
-	ok, err := r.isBelongToRoom(roomBill.RoomId, roomBill.CreatedBy)
+func (r *roomBillRepository) CanCreate(roomID, userID uuid.UUID) error {
+	ok, err := r.isBelongToRoom(roomID, userID)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if !ok {
-		return nil, errors.New("user not belong to this room, cannot create room bill")
+		return errors.New("user not belong to this room, cannot create room bill")
+	}
+	return nil
+}
+
+func (r *roomBillRepository) Create(roomBill *model.RoomBill) (*model.RoomBill, error) {
+	if err := r.CanCreate(roomBill.RoomId, roomBill.CreatedBy); err != nil {
+		return nil, err
 	}
 	if err := r.db.Create(roomBill).Error; err != nil {
 		return nil, err
