@@ -33,7 +33,6 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	roomMemberHandler := handler.NewRoomMemberHandler(roomMemberService)
 
 	googleAuth, err := service.NewGoogleAuthService(cfg.GoogleClientId)
-
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -85,18 +84,17 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			room.POST("/:id/transfer-ownership", roomMemberHandler.TransferOwnership)
 			room.POST("/:id/leave", roomMemberHandler.LeaveRoom)
 
-			//bill
+			// Bills
 			room.POST("/:id/bills", roomBillHandler.CreateRoomBill)
 			room.GET("/:id/bills", roomBillHandler.GetRoomBills)
 			room.GET("/:id/bills/:billId", roomBillHandler.GetRoomBillByID)
+			room.POST("/:id/bills/:billId/shares", roomBillHandler.CreateRoomBillShares)
 		}
 
-		// room-invitation
 		protected.GET("/invitations", roomMemberHandler.GetMyInvitations)
 		protected.POST("/invitations/:invitationId/accept", roomMemberHandler.AcceptInvitation)
 		protected.POST("/invitations/:invitationId/decline", roomMemberHandler.DeclineInvitation)
 
-		//bill-categories
 		protected.GET("/bill-categories", billHandler.GetBillCategories)
 	}
 
