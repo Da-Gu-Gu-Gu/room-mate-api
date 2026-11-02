@@ -84,5 +84,35 @@ func (h *RoomBillHandler) GetRoomBillByID(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, bill)
+}
 
+func (h *RoomBillHandler) CreateRoomBillShares(c *gin.Context) {
+	roomID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid room ID"})
+		return
+	}
+	billID, err := uuid.Parse(c.Param("billId"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid bill ID"})
+		return
+	}
+	requesterID, ok := currentUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authenticated user"})
+		return
+	}
+
+	var req dto.CreateRoomBillSharesRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request payload"})
+		return
+	}
+
+	shares, err := h.roomBillService.CreateRoomBillShares(roomID, billID, requesterID, &req)
+	if err != nil {
+		respondRoomError(c, err)
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"members": shares})
 }
