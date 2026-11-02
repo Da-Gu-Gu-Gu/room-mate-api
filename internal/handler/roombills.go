@@ -1,8 +1,15 @@
 package handler
 
 import (
+	"bytes"
 	"errors"
+	"io"
+	"math"
 	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
 	"room-mate-api/internal/dto"
 	"room-mate-api/internal/repository"
 	"room-mate-api/internal/service"
@@ -10,6 +17,130 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
+
+const maxRoomBillReceiptSize = 5 << 20 // 5 MB
+
+func (h *RoomBillHandler) CreateRoomBill(c *gin.Context) {
+	roomID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid room ID"})
+		return
+	}
+	userID, ok := currentUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authenticated user"})
+		return
+	}
+
+	var req dto.RoomBillRequest
+	var receiptImage []byte
+	var contentType, extension string
+
+	if strings.HasPrefix(c.GetHeader("Content-Type"), "multipart/form-data") {
+		if err := c.Request.ParseMultipartForm(1 << 20); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid multipart payload"})
+			return
+		}
+
+		categoryID, err := uuid.Parse(strings.TrimSpace(c.PostForm("categoryId")))
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid categoryId"})
+			return
+		}
+		total, err := strconv.ParseFloat(strings.TrimSpace(c.PostForm("total")), 64)
+		if err != nil || total <= 0 || math.IsInf(total, 0) || math.IsNaN(total) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "total must be greater than zero"})
+			return
+		}
+		name := strings.TrimSpace(c.PostForm("name"))
+		if name == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "name is required"})
+			return
+		}
+
+		req = dto.RoomBillRequest{
+			RoomID:     roomID,
+			CategoryID: categoryID,
+			Name:       name,
+			Total:      total,
+			CreatedBy:  userID,
+		}
+		if description := strings.TrimSpace(c.PostForm("description")); description != "" {
+			req.Description = &description
+		}
+		if dueDateValue := strings.TrimSpace(c.PostForm("dueDate")); dueDateValue != "" {
+			dueDate, parseErr := time.Parse(time.RFC3339, dueDateValue)
+			if parseErr != nil {
+				dueDate, parseErr = time.Parse("2006-01-02", dueDateValue)
+			}
+			if parseErr != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "dueDate must use YYYY-MM-DD or RFC3339 format"})
+				return
+			}
+			req.DueDate = &dueDate
+		}
+
+		fileHeader, fileErr := c.FormFile("receiptImage")
+		if fileErr != nil && !errors.Is(fileErr, http.ErrMissingFile) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid receiptImage"})
+			return
+		}
+		if fileHeader != nil {
+			if fileHeader.Size > maxRoomBillReceiptSize {
+				c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "receiptImage must be 5 MB or smaller"})
+				return
+			}
+			file, openErr := fileHeader.Open()
+			if openErr != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "unable to read receiptImage"})
+				return
+			}
+			defer file.Close()
+
+			receiptImage, err = io.ReadAll(io.LimitReader(file, maxRoomBillReceiptSize+1))
+			if err != nil || len(receiptImage) > maxRoomBillReceiptSize {
+				c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "receiptImage must be 5 MB or smaller"})
+				return
+			}
+			contentType, extension, err = detectReceiptImage(receiptImage)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+		}
+	} else {
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request payload"})
+			return
+		}
+		req.RoomID = roomID
+		req.CreatedBy = userID
+	}
+
+	createdRoomBill, err := h.roomBillService.CreateRoomBill(&req, receiptImage, contentType, extension)
+	if err != nil {
+		if errors.Is(err, service.ErrRoomBillStorageUnavailable) {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "image storage is not configured"})
+			return
+		}
+		respondRoomError(c, err)
+		return
+	}
+	c.JSON(http.StatusCreated, createdRoomBill)
+}
+
+func detectReceiptImage(data []byte) (contentType, extension string, err error) {
+	switch {
+	case len(data) >= 3 && bytes.Equal(data[:3], []byte{0xff, 0xd8, 0xff}):
+		return "image/jpeg", "jpg", nil
+	case len(data) >= 8 && bytes.Equal(data[:8], []byte{0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a}):
+		return "image/png", "png", nil
+	case len(data) >= 12 && string(data[0:4]) == "RIFF" && string(data[8:12]) == "WEBP":
+		return "image/webp", "webp", nil
+	default:
+		return "", "", errors.New("receiptImage must be a valid JPEG, PNG, or WebP image")
+	}
+}
 
 type RoomBillHandler struct {
 	roomBillService *service.RoomBillService
@@ -19,28 +150,6 @@ func NewRoomBillHandler(roomBillService *service.RoomBillService) *RoomBillHandl
 	return &RoomBillHandler{
 		roomBillService: roomBillService,
 	}
-}
-
-func (h *RoomBillHandler) CreateRoomBill(c *gin.Context) {
-	roomId, err := uuid.Parse(c.Param("id"))
-	id, ok := currentUserID(c)
-	if !ok || err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authenticated user or room ID"})
-		return
-	}
-	var req dto.RoomBillRequest
-	req.CreatedBy = id
-	req.RoomID = roomId
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request payload"})
-		return
-	}
-	createdRoomBill, err := h.roomBillService.CreateRoomBill(&req)
-	if err != nil {
-		respondRoomError(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, createdRoomBill)
 }
 
 func (h *RoomBillHandler) GetRoomBills(c *gin.Context) {
