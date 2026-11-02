@@ -30,12 +30,35 @@ Set these environment variables to enable receipt uploads:
 
 ```env
 AWS_REGION=ap-southeast-1
-AWS_S3_BUCKET=your-private-room-mate-bucket
+AWS_S3_BUCKET=your-room-mate-bucket
 ```
 
-The AWS SDK uses its standard credential chain (for local development, configure the AWS CLI profile or `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`; in production, prefer an IAM role). Keep the bucket private and Block Public Access enabled. The app needs `s3:PutObject`, `s3:GetObject`, and `s3:DeleteObject` permissions for the `room-bills/*` object prefix.
+The AWS SDK uses its standard credential chain (for local development, configure the AWS CLI profile or `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`; in production, prefer an IAM role). The application needs `s3:PutObject` and `s3:DeleteObject` permissions for the `room-bills/*` object prefix.
 
-The API validates the image bytes, limits uploads to 5 MB, stores the S3 object key in PostgreSQL, and returns a private presigned GET URL that expires after 10 minutes. Room membership is checked before upload. If saving the bill fails after the upload, the service attempts to delete the uploaded object.
+### Public image access
+
+Receipt URLs are permanent direct S3 URLs, not presigned URLs. Anyone who obtains a receipt URL can view that image without signing in. Do not upload receipts containing information that should remain private.
+
+Add a bucket policy like the following, replacing the bucket name. It grants public read access only to objects under `room-bills/*`:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "PublicReadRoomBillReceiptImages",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::your-room-mate-bucket/room-bills/*"
+    }
+  ]
+}
+```
+
+For this bucket policy to work, the S3 Block Public Access setting that blocks public bucket policies must allow this policy (and any applicable account-level setting must also allow it). Keep ACLs disabled; use the bucket policy above rather than `public-read` object ACLs. Do not grant public `PutObject` or `DeleteObject`.
+
+The API validates image bytes, limits uploads to 5 MB, stores the S3 object key in PostgreSQL, and returns a stable URL such as `https://your-room-mate-bucket.s3.ap-southeast-1.amazonaws.com/room-bills/<room-id>/<bill-id>/receipt.jpg`. Room membership is checked before upload. If saving the bill fails after the upload, the service attempts to delete the uploaded object.
 
 Apply migration `000013_room_bill_receipt_image.up.sql` after the existing room-bill migrations. Run `go mod tidy` after pulling the AWS SDK dependencies to update `go.sum`.
 
