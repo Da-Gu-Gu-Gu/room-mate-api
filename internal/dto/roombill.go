@@ -16,3 +16,12 @@ type RoomBillRequest struct {
 	DueDate     *time.Time `json:"dueDate"`
 	CreatedBy   uuid.UUID  `json:"createdBy" binding:"required"`
 }
+
+type CreateRoomBillSharesRequest struct {
+	Members []RoomBillShareItem `json:"members" binding:"required,min=1,dive"`
+}
+
+type RoomBillShareItem struct {
+	UserID uuid.UUID `json:"userId" binding:"required"`
+	Amount float64   `json:"amount" binding:"required,gt=0"`
+}
