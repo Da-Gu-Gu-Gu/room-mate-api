@@ -49,6 +49,10 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	billService := service.NewBillService(billRepository)
 	billHandler := handler.NewBillHandler(billService)
 
+	roomBillRepository := repository.NewRoomBillRepository(db)
+	roomBillService := service.NewRoomBillService(roomBillRepository)
+	roomBillHandler := handler.NewRoomBillHandler(roomBillService)
+
 	api := router.Group("/api/v1")
 	api.POST("/auth/google", authHandler.GoogleLogin)
 	api.POST("/auth/apple", authHandler.LoginWithApple)
@@ -80,6 +84,11 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			room.POST("/:id/invitations", roomMemberHandler.Invite)
 			room.POST("/:id/transfer-ownership", roomMemberHandler.TransferOwnership)
 			room.POST("/:id/leave", roomMemberHandler.LeaveRoom)
+
+			//bill
+			room.POST("/:id/bills", roomBillHandler.CreateRoomBill)
+			room.GET("/:id/bills", roomBillHandler.GetRoomBills)
+			room.GET("/:id/bills/:billId", roomBillHandler.GetRoomBillByID)
 		}
 
 		// room-invitation
