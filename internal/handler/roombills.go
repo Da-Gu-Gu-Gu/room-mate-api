@@ -37,6 +37,7 @@ func (h *RoomBillHandler) CreateRoomBill(c *gin.Context) {
 	var contentType, extension string
 
 	if strings.HasPrefix(c.GetHeader("Content-Type"), "multipart/form-data") {
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxRoomBillReceiptSize+(1<<20))
 		if err := c.Request.ParseMultipartForm(1 << 20); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid multipart payload"})
 			return
