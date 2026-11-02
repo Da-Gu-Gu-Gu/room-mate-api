@@ -16,7 +16,7 @@ type RoomBill struct {
 	Status           string     `json:"status" gorm:"type:text;not null;default:pending"`
 	DueDate          *time.Time `json:"dueDate" gorm:"type:timestamptz"`
 	CreatedBy        uuid.UUID  `json:"createdBy" gorm:"type:uuid;not null"`
-	ReceiptImageKey  string     `json:"-" gorm:"column:receipt_image_key"`
+	ReceiptImageKey  *string    `json:"-" gorm:"column:receipt_image_key"`
 	ReceiptImageURL  string     `json:"receiptImageUrl,omitempty" gorm:"-"`
 	CreatedAt        time.Time  `json:"createdAt" gorm:"autoCreateTime"`
 	UpdatedAt        time.Time  `json:"updatedAt" gorm:"autoUpdateTime"`
