@@ -50,18 +50,22 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	billService := service.NewBillService(billRepository)
 	billHandler := handler.NewBillHandler(billService)
 
+	var imageStorage service.ImageObjectStorage
 	var roomBillStorage service.RoomBillObjectStorage
 	if cfg.AWSRegion != "" && cfg.AWSS3Bucket != "" {
 		s3Storage, err := storage.NewS3Storage(context.Background(), cfg.AWSRegion, cfg.AWSS3Bucket)
 		if err != nil {
 			log.Fatal(err)
 		}
+		imageStorage = s3Storage
 		roomBillStorage = s3Storage
 	}
 
 	roomBillRepository := repository.NewRoomBillRepository(db)
 	roomBillService := service.NewRoomBillService(roomBillRepository, roomBillStorage)
 	roomBillHandler := handler.NewRoomBillHandler(roomBillService)
+	uploadService := service.NewUploadService(imageStorage)
+	uploadHandler := handler.NewUploadHandler(uploadService)
 
 	api := router.Group("/api/v1")
 	api.POST("/auth/google", authHandler.GoogleLogin)
@@ -84,6 +88,8 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		theme := protected.Group("/themes")
 		theme.GET("", themeHandler.GetThemes)
 
+		protected.POST("/uploads/images", uploadHandler.UploadImage)
+
 		room := protected.Group("/rooms")
 		{
 			room.POST("", roomHandler.CreateRoom)
@@ -96,7 +102,6 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			room.POST("/:id/leave", roomMemberHandler.LeaveRoom)
 
 			// Bills
-			room.POST("/:id/bill-receipt-images", roomBillHandler.UploadRoomBillReceipt)
 			room.POST("/:id/bills", roomBillHandler.CreateRoomBill)
 			room.GET("/:id/bills", roomBillHandler.GetRoomBills)
 			room.GET("/:id/bills/:billId", roomBillHandler.GetRoomBillByID)
