@@ -96,6 +96,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			room.POST("/:id/leave", roomMemberHandler.LeaveRoom)
 
 			// Bills
+			room.POST("/:id/bill-receipt-images", roomBillHandler.UploadRoomBillReceipt)
 			room.POST("/:id/bills", roomBillHandler.CreateRoomBill)
 			room.GET("/:id/bills", roomBillHandler.GetRoomBills)
 			room.GET("/:id/bills/:billId", roomBillHandler.GetRoomBillByID)
