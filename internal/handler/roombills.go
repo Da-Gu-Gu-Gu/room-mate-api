@@ -4,11 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"math"
 	"net/http"
-	"strconv"
-	"strings"
-	"time"
 
 	"room-mate-api/internal/dto"
 	"room-mate-api/internal/repository"
@@ -19,6 +15,69 @@ import (
 )
 
 const maxRoomBillReceiptSize = 5 << 20 // 5 MB
+
+type RoomBillHandler struct {
+	roomBillService *service.RoomBillService
+}
+
+func NewRoomBillHandler(roomBillService *service.RoomBillService) *RoomBillHandler {
+	return &RoomBillHandler{roomBillService: roomBillService}
+}
+
+// UploadRoomBillReceipt uploads a receipt independently. The returned URL can
+// then be included as receiptImageUrl when creating the room bill.
+func (h *RoomBillHandler) UploadRoomBillReceipt(c *gin.Context) {
+	roomID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid room ID"})
+		return
+	}
+	userID, ok := currentUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authenticated user"})
+		return
+	}
+
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxRoomBillReceiptSize+(1<<20))
+	fileHeader, err := c.FormFile("receiptImage")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "receiptImage file is required"})
+		return
+	}
+	if fileHeader.Size > maxRoomBillReceiptSize {
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "receiptImage must be 5 MB or smaller"})
+		return
+	}
+
+	file, err := fileHeader.Open()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "unable to read receiptImage"})
+		return
+	}
+	defer file.Close()
+
+	imageBytes, err := io.ReadAll(io.LimitReader(file, maxRoomBillReceiptSize+1))
+	if err != nil || len(imageBytes) > maxRoomBillReceiptSize {
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "receiptImage must be 5 MB or smaller"})
+		return
+	}
+	contentType, extension, err := detectReceiptImage(imageBytes)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	imageURL, err := h.roomBillService.UploadRoomBillReceipt(roomID, userID, imageBytes, contentType, extension)
+	if err != nil {
+		if errors.Is(err, service.ErrRoomBillStorageUnavailable) {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "image storage is not configured"})
+			return
+		}
+		respondRoomError(c, err)
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"receiptImageUrl": imageURL})
+}
 
 func (h *RoomBillHandler) CreateRoomBill(c *gin.Context) {
 	roomID, err := uuid.Parse(c.Param("id"))
@@ -33,98 +92,23 @@ func (h *RoomBillHandler) CreateRoomBill(c *gin.Context) {
 	}
 
 	var req dto.RoomBillRequest
-	var receiptImage []byte
-	var contentType, extension string
-
-	if strings.HasPrefix(c.GetHeader("Content-Type"), "multipart/form-data") {
-		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxRoomBillReceiptSize+(1<<20))
-		if err := c.Request.ParseMultipartForm(1 << 20); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid multipart payload"})
-			return
-		}
-
-		categoryID, err := uuid.Parse(strings.TrimSpace(c.PostForm("categoryId")))
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid categoryId"})
-			return
-		}
-		total, err := strconv.ParseFloat(strings.TrimSpace(c.PostForm("total")), 64)
-		if err != nil || total <= 0 || math.IsInf(total, 0) || math.IsNaN(total) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "total must be greater than zero"})
-			return
-		}
-		name := strings.TrimSpace(c.PostForm("name"))
-		if name == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "name is required"})
-			return
-		}
-
-		req = dto.RoomBillRequest{
-			RoomID:     roomID,
-			CategoryID: categoryID,
-			Name:       name,
-			Total:      total,
-			CreatedBy:  userID,
-		}
-		if description := strings.TrimSpace(c.PostForm("description")); description != "" {
-			req.Description = &description
-		}
-		if dueDateValue := strings.TrimSpace(c.PostForm("dueDate")); dueDateValue != "" {
-			dueDate, parseErr := time.Parse(time.RFC3339, dueDateValue)
-			if parseErr != nil {
-				dueDate, parseErr = time.Parse("2006-01-02", dueDateValue)
-			}
-			if parseErr != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "dueDate must use YYYY-MM-DD or RFC3339 format"})
-				return
-			}
-			req.DueDate = &dueDate
-		}
-
-		fileHeader, fileErr := c.FormFile("receiptImage")
-		if fileErr != nil && !errors.Is(fileErr, http.ErrMissingFile) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid receiptImage"})
-			return
-		}
-		if fileHeader != nil {
-			if fileHeader.Size > maxRoomBillReceiptSize {
-				c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "receiptImage must be 5 MB or smaller"})
-				return
-			}
-			file, openErr := fileHeader.Open()
-			if openErr != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "unable to read receiptImage"})
-				return
-			}
-			defer file.Close()
-
-			receiptImage, err = io.ReadAll(io.LimitReader(file, maxRoomBillReceiptSize+1))
-			if err != nil || len(receiptImage) > maxRoomBillReceiptSize {
-				c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "receiptImage must be 5 MB or smaller"})
-				return
-			}
-			contentType, extension, err = detectReceiptImage(receiptImage)
-			if err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-				return
-			}
-		}
-	} else {
-		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request payload"})
-			return
-		}
-		req.RoomID = roomID
-		req.CreatedBy = userID
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request payload"})
+		return
 	}
+	req.RoomID = roomID
+	req.CreatedBy = userID
 
-	createdRoomBill, err := h.roomBillService.CreateRoomBill(&req, receiptImage, contentType, extension)
+	createdRoomBill, err := h.roomBillService.CreateRoomBill(&req)
 	if err != nil {
-		if errors.Is(err, service.ErrRoomBillStorageUnavailable) {
+		switch {
+		case errors.Is(err, service.ErrRoomBillStorageUnavailable):
 			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "image storage is not configured"})
-			return
+		case errors.Is(err, service.ErrInvalidReceiptImageURL):
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		default:
+			respondRoomError(c, err)
 		}
-		respondRoomError(c, err)
 		return
 	}
 	c.JSON(http.StatusCreated, createdRoomBill)
@@ -143,29 +127,19 @@ func detectReceiptImage(data []byte) (contentType, extension string, err error) 
 	}
 }
 
-type RoomBillHandler struct {
-	roomBillService *service.RoomBillService
-}
-
-func NewRoomBillHandler(roomBillService *service.RoomBillService) *RoomBillHandler {
-	return &RoomBillHandler{
-		roomBillService: roomBillService,
-	}
-}
-
 func (h *RoomBillHandler) GetRoomBills(c *gin.Context) {
-	roomId, err := uuid.Parse(c.Param("id"))
+	roomID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid room ID"})
 		return
 	}
-	userId, ok := currentUserID(c)
+	userID, ok := currentUserID(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authenticated user"})
 		return
 	}
 
-	bills, err := h.roomBillService.GetRoomBills(roomId, userId)
+	bills, err := h.roomBillService.GetRoomBills(roomID, userID)
 	if err != nil {
 		respondRoomError(c, err)
 		return
@@ -174,23 +148,23 @@ func (h *RoomBillHandler) GetRoomBills(c *gin.Context) {
 }
 
 func (h *RoomBillHandler) GetRoomBillByID(c *gin.Context) {
-	roomId, err := uuid.Parse(c.Param("id"))
+	roomID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid room ID"})
 		return
 	}
-	billId, err := uuid.Parse(c.Param("billId"))
+	billID, err := uuid.Parse(c.Param("billId"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid bill ID"})
 		return
 	}
-	userId, ok := currentUserID(c)
+	userID, ok := currentUserID(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authenticated user"})
 		return
 	}
 
-	bill, err := h.roomBillService.GetRoomBillByID(roomId, billId, userId)
+	bill, err := h.roomBillService.GetRoomBillByID(roomID, billID, userID)
 	if err != nil {
 		respondRoomError(c, err)
 		return
