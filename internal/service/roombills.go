@@ -1,13 +1,11 @@
 package service
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"strings"
-	"time"
 
 	"room-mate-api/internal/dto"
 	"room-mate-api/internal/model"
@@ -37,26 +35,6 @@ func NewRoomBillService(roomBillRepo repository.RoomBillRepository, objectStorag
 	return &RoomBillService{roomBillRepository: roomBillRepo, objectStorage: objectStorage}
 }
 
-// UploadRoomBillReceipt uploads a receipt independently from bill creation.
-// The returned URL is stable and can be included in CreateRoomBillRequest.
-func (s *RoomBillService) UploadRoomBillReceipt(roomID, userID uuid.UUID, image []byte, contentType, extension string) (string, error) {
-	if s.objectStorage == nil {
-		return "", ErrRoomBillStorageUnavailable
-	}
-	if err := s.roomBillRepository.CanCreate(roomID, userID); err != nil {
-		return "", err
-	}
-
-	key := fmt.Sprintf("room-bills/%s/uploads/%s.%s", roomID, uuid.New(), extension)
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	if err := s.objectStorage.Upload(ctx, key, bytes.NewReader(image), contentType); err != nil {
-		return "", err
-	}
-	return s.objectStorage.PublicURL(key), nil
-}
-
 func (s *RoomBillService) CreateRoomBill(req *dto.RoomBillRequest) (*model.RoomBill, error) {
 	roomBill := &model.RoomBill{
 		ID: uuid.New(), RoomId: req.RoomID, CategoryId: req.CategoryID,
@@ -73,7 +51,12 @@ func (s *RoomBillService) CreateRoomBill(req *dto.RoomBillRequest) (*model.RoomB
 			return nil, ErrRoomBillStorageUnavailable
 		}
 		key, err := s.objectStorage.ObjectKeyFromPublicURL(*req.ReceiptImageURL)
-		if err != nil || !strings.HasPrefix(key, fmt.Sprintf("room-bills/%s/uploads/", req.RoomID)) {
+		if err != nil {
+			return nil, ErrInvalidReceiptImageURL
+		}
+		commonUploadPrefix := "uploads/images/"
+		legacyRoomPrefix := fmt.Sprintf("room-bills/%s/uploads/", req.RoomID)
+		if !strings.HasPrefix(key, commonUploadPrefix) && !strings.HasPrefix(key, legacyRoomPrefix) {
 			return nil, ErrInvalidReceiptImageURL
 		}
 		roomBill.ReceiptImageKey = &key
