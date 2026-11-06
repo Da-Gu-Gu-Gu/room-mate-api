@@ -4,29 +4,44 @@ Go API for the Room Mate household cost-sharing app.
 
 ## Room bill receipt images
 
-Room bill creation accepts either the existing JSON request (without an image) or `multipart/form-data` with an optional `receiptImage` file.
+Receipt upload is a separate endpoint from bill creation. Both endpoints require authentication, and the uploader must be an active member of the room.
 
-Multipart fields:
-- `categoryId` (required UUID)
-- `name` (required)
-- `total` (required, greater than zero)
-- `description` (optional)
-- `dueDate` (optional, `YYYY-MM-DD` or RFC3339)
-- `receiptImage` (optional JPEG, PNG, or WebP; maximum 5 MB)
+### 1. Upload the receipt
 
-Example:
+```bash
+curl -X POST "http://localhost:8080/api/v1/rooms/<room-id>/bill-receipt-images" \
+  -H "Authorization: Bearer <access-token>" \
+  -F "receiptImage=@./electricity-receipt.jpg"
+```
+
+The endpoint accepts JPEG, PNG, or WebP images up to 5 MB and returns a permanent URL:
+
+```json
+{
+  "receiptImageUrl": "https://your-room-mate-bucket.s3.ap-southeast-1.amazonaws.com/room-bills/<room-id>/uploads/<uuid>.jpg"
+}
+```
+
+### 2. Create the bill using the returned URL
 
 ```bash
 curl -X POST "http://localhost:8080/api/v1/rooms/<room-id>/bills" \
   -H "Authorization: Bearer <access-token>" \
-  -F "categoryId=<category-id>" \
-  -F "name=Electricity bill" \
-  -F "total=1200" \
-  -F "dueDate=2026-11-15" \
-  -F "receiptImage=@./electricity-receipt.jpg"
+  -H "Content-Type: application/json" \
+  -d '{
+    "categoryId": "<category-id>",
+    "name": "Electricity bill",
+    "total": 1200,
+    "dueDate": "2026-11-15T00:00:00Z",
+    "receiptImageUrl": "https://your-room-mate-bucket.s3.ap-southeast-1.amazonaws.com/room-bills/<room-id>/uploads/<uuid>.jpg"
+  }'
 ```
 
-Set these environment variables to enable receipt uploads:
+The receipt URL is optional. The API verifies that it belongs to the configured S3 bucket and the current room's upload prefix before attaching the object key to the bill.
+
+### AWS configuration
+
+Set these environment variables:
 
 ```env
 AWS_REGION=ap-southeast-1
@@ -58,7 +73,7 @@ Add a bucket policy like the following, replacing the bucket name. It grants pub
 
 For this bucket policy to work, the S3 Block Public Access setting that blocks public bucket policies must allow this policy (and any applicable account-level setting must also allow it). Keep ACLs disabled; use the bucket policy above rather than `public-read` object ACLs. Do not grant public `PutObject` or `DeleteObject`.
 
-The API validates image bytes, limits uploads to 5 MB, stores the S3 object key in PostgreSQL, and returns a stable URL such as `https://your-room-mate-bucket.s3.ap-southeast-1.amazonaws.com/room-bills/<room-id>/<bill-id>/receipt.jpg`. Room membership is checked before upload. If saving the bill fails after the upload, the service attempts to delete the uploaded object.
+The API stores the S3 object key in PostgreSQL and returns the permanent URL when reading a bill. Images uploaded but never attached to a bill remain in S3. Configure an S3 lifecycle rule to expire unclaimed uploads under `room-bills/*/uploads/` after a suitable period, or add a cleanup job later.
 
 Apply migration `000013_room_bill_receipt_image.up.sql` after the existing room-bill migrations. Run `go mod tidy` after pulling the AWS SDK dependencies to update `go.sum`.
 
