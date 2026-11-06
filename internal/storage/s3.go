@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
@@ -60,6 +61,22 @@ func (s *S3Storage) Delete(ctx context.Context, key string) error {
 
 // PublicURL returns a stable S3 object URL. The bucket policy must allow
 // s3:GetObject for the room-bills/* prefix.
+func (s *S3Storage) ObjectKeyFromPublicURL(publicURL string) (string, error) {
+	parsed, err := url.Parse(publicURL)
+	if err != nil {
+		return "", fmt.Errorf("parse receipt image URL: %w", err)
+	}
+	expectedHost := fmt.Sprintf("%s.s3.%s.amazonaws.com", s.bucket, s.region)
+	if parsed.Scheme != "https" || parsed.Host != expectedHost || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return "", fmt.Errorf("receipt image URL does not belong to configured S3 bucket")
+	}
+	key, err := url.PathUnescape(strings.TrimPrefix(parsed.EscapedPath(), "/"))
+	if err != nil || key == "" {
+		return "", fmt.Errorf("invalid S3 object key in receipt image URL")
+	}
+	return key, nil
+}
+
 func (s *S3Storage) PublicURL(key string) string {
 	objectURL := url.URL{
 		Scheme: "https",
