@@ -14,6 +14,7 @@ type RoomBillRequest struct {
 	Total       float64    `json:"total" binding:"required,gt=0"`
 	Status      *string    `json:"status"`
 	DueDate     *time.Time `json:"dueDate"`
+	ReceiptImageURL *string `json:"receiptImageUrl"`
 	CreatedBy   uuid.UUID  `json:"createdBy"`
 }
 
