@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"bytes"
 	"errors"
 	"io"
 	"net/http"
@@ -9,6 +8,7 @@ import (
 	"room-mate-api/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gabriel-vasile/mimetype"
 )
 
 const maxImageUploadSize = 5 << 20 // 5 MB
@@ -53,13 +53,19 @@ func (h *UploadHandler) UploadImage(c *gin.Context) {
 		return
 	}
 
-	contentType, extension, err := detectUploadedImage(imageBytes)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	detected := mimetype.Detect(imageBytes)
+	allowedTypes := map[string]string{
+		"image/jpeg": "jpg",
+		"image/png":  "png",
+		"image/webp": "webp",
+	}
+	extension, ok := allowedTypes[detected.String()]
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "only JPEG, PNG, and WebP images are allowed"})
 		return
 	}
 
-	imageURL, err := h.uploadService.UploadImage(imageBytes, contentType, extension)
+	imageURL, err := h.uploadService.UploadImage(imageBytes, detected.String(), extension)
 	if err != nil {
 		if errors.Is(err, service.ErrRoomBillStorageUnavailable) {
 			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "image storage is not configured"})
@@ -70,17 +76,4 @@ func (h *UploadHandler) UploadImage(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"imageUrl": imageURL})
-}
-
-func detectUploadedImage(data []byte) (contentType, extension string, err error) {
-	switch {
-	case len(data) >= 3 && bytes.Equal(data[:3], []byte{0xff, 0xd8, 0xff}):
-		return "image/jpeg", "jpg", nil
-	case len(data) >= 8 && bytes.Equal(data[:8], []byte{0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a}):
-		return "image/png", "png", nil
-	case len(data) >= 12 && string(data[0:4]) == "RIFF" && string(data[8:12]) == "WEBP":
-		return "image/webp", "webp", nil
-	default:
-		return "", "", errors.New("image must be a valid JPEG, PNG, or WebP image")
-	}
 }
