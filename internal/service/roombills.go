@@ -50,14 +50,13 @@ func (s *RoomBillService) CreateRoomBill(req *dto.RoomBillRequest) (*model.RoomB
 			return nil, ErrRoomBillStorageUnavailable
 		}
 		key, err := s.objectStorage.ObjectKeyFromPublicURL(*req.ReceiptImageURL)
-		if err != nil {
-			return nil, ErrInvalidReceiptImageURL
-		}
-		if !strings.HasPrefix(key, "uploads/images/") {
+		if err != nil || !strings.HasPrefix(key, "uploads/images/") {
 			return nil, ErrInvalidReceiptImageURL
 		}
 
-		roomBill.ReceiptImageKey = &key
+		// Persist the complete public URL instead of the S3 object key.
+		imageURL := strings.TrimSpace(*req.ReceiptImageURL)
+		roomBill.ReceiptImageURL = &imageURL
 	}
 
 	createdRoomBill, err := s.roomBillRepository.Create(roomBill)
@@ -88,11 +87,17 @@ func (s *RoomBillService) GetRoomBillByID(roomID, billID, userID uuid.UUID) (*mo
 	return bill, nil
 }
 
+// addReceiptImageURL keeps responses compatible with records created before
+// receipt_image_url was introduced.
 func (s *RoomBillService) addReceiptImageURL(bill *model.RoomBill) {
+	if bill.ReceiptImageURL != nil && *bill.ReceiptImageURL != "" {
+		return
+	}
 	if bill.ReceiptImageKey == nil || *bill.ReceiptImageKey == "" || s.objectStorage == nil {
 		return
 	}
-	bill.ReceiptImageURL = s.objectStorage.PublicURL(*bill.ReceiptImageKey)
+	imageURL := s.objectStorage.PublicURL(*bill.ReceiptImageKey)
+	bill.ReceiptImageURL = &imageURL
 }
 
 func (s *RoomBillService) CreateRoomBillShares(roomID, billID, requesterID uuid.UUID, req *dto.CreateRoomBillSharesRequest) ([]*model.RoomBillShare, error) {
