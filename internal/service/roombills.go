@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"strings"
 
@@ -54,11 +53,10 @@ func (s *RoomBillService) CreateRoomBill(req *dto.RoomBillRequest) (*model.RoomB
 		if err != nil {
 			return nil, ErrInvalidReceiptImageURL
 		}
-		commonUploadPrefix := "uploads/images/"
-		legacyRoomPrefix := fmt.Sprintf("room-bills/%s/uploads/", req.RoomID)
-		if !strings.HasPrefix(key, commonUploadPrefix) && !strings.HasPrefix(key, legacyRoomPrefix) {
+		if !strings.HasPrefix(key, "uploads/images/") {
 			return nil, ErrInvalidReceiptImageURL
 		}
+
 		roomBill.ReceiptImageKey = &key
 	}
 

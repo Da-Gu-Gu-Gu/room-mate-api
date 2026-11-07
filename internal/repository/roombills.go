@@ -13,10 +13,10 @@ import (
 )
 
 var (
-	ErrRoomBillNotFound       = errors.New("room bill not found")
-	ErrRoomBillShareForbidden = errors.New("user is not an active member of this room")
-	ErrRoomBillShareTotal     = errors.New("assigned share amounts must equal the bill total")
-	ErrInvalidRoomBillShares  = errors.New("room bill shares contain duplicate users or invalid amounts")
+	ErrRoomBillNotFound              = errors.New("room bill not found")
+	ErrRoomBillShareForbidden        = errors.New("user is not an active member of this room")
+	ErrRoomBillShareTotal            = errors.New("assigned share amounts must equal the bill total")
+	ErrInvalidRoomBillShares         = errors.New("room bill shares contain duplicate users or invalid amounts")
 	ErrRoomBillSharesAlreadyAssigned = errors.New("shares have already been assigned for this bill")
 )
 
@@ -140,6 +140,7 @@ func (r *roomBillRepository) CreateShares(roomID, billID, requesterID uuid.UUID,
 			seenUsers[share.UserID] = struct{}{}
 			assignedCents += int64(math.Round(share.Amount * 100))
 
+			//check if the user is still an active member of the room
 			var memberCount int64
 			if err := tx.Model(&model.RoomMember{}).
 				Where("room_id = ? AND user_id = ? AND leave_at IS NULL", roomID, share.UserID).
