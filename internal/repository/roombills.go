@@ -26,6 +26,8 @@ type RoomBillRepository interface {
 	GetRoomBills(roomID, userID uuid.UUID) ([]*model.RoomBill, error)
 	GetRoomBillById(roomID, userID, billID uuid.UUID) (*model.RoomBill, error)
 	CreateShares(roomID, billID, requesterID uuid.UUID, shares []model.RoomBillShare) ([]*model.RoomBillShare, error)
+	GETShares(roomID, billID, userID uuid.UUID) ([]*model.RoomBillShare, error)
+	CreatePayment(roomID, billShareID, userID uuid.UUID, payment *model.RoomBillPayment) (*model.RoomBillPayment, error)
 }
 
 type roomBillRepository struct {
@@ -185,4 +187,30 @@ func (r *roomBillRepository) CreateShares(roomID, billID, requesterID uuid.UUID,
 		return nil, err
 	}
 	return createdShares, nil
+}
+
+func (r *roomBillRepository) GETShares(roomID, billID, userID uuid.UUID) ([]*model.RoomBillShare, error) {
+	ok, err := r.isBelongToRoom(roomID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, errors.New("user not belong to this room, cannot get room bill shares")
+	}
+
+	var shares []*model.RoomBillShare
+	if err := r.db.Where("bill_id = ?", billID).Find(&shares).Error; err != nil {
+		return nil, err
+	}
+	return shares, nil
+}
+
+func (r *roomBillRepository) CreatePayment(roomID, billShareID, userID uuid.UUID, payment *model.RoomBillPayment) (*model.RoomBillPayment, error) {
+	if err := r.CanCreate(roomID, userID); err != nil {
+		return nil, err
+	}
+	if err := r.db.Create(payment).Error; err != nil {
+		return nil, err
+	}
+	return payment, nil
 }

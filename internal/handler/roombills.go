@@ -141,3 +141,71 @@ func (h *RoomBillHandler) CreateRoomBillShares(c *gin.Context) {
 	}
 	c.JSON(http.StatusCreated, gin.H{"members": shares})
 }
+
+func (h *RoomBillHandler) GetRoomBillShares(c *gin.Context) {
+	roomID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid room ID"})
+		return
+	}
+	billID, err := uuid.Parse(c.Param("billId"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid bill ID"})
+		return
+	}
+	userID, ok := currentUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authenticated user"})
+		return
+	}
+
+	shares, err := h.roomBillService.GetRoomBillShares(roomID, billID, userID)
+	if err != nil {
+		switch {
+		case errors.Is(err, repository.ErrRoomBillNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": "room bill not found"})
+		case errors.Is(err, repository.ErrRoomBillShareForbidden):
+			c.JSON(http.StatusForbidden, gin.H{"error": "you are not an active member of this room"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		}
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"members": shares})
+}
+
+func (h *RoomBillHandler) CreateRoomBillPayment(c *gin.Context) {
+	roomID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid room ID"})
+		return
+	}
+	billID, err := uuid.Parse(c.Param("billId"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid bill ID"})
+		return
+	}
+	userID, ok := currentUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authenticated user"})
+		return
+	}
+
+	var req dto.CreateRoomBillPaymentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request payload"})
+		return
+	}
+
+	payment, err := h.roomBillService.CreateRoomBillPayment(roomID, billID, userID, &req)
+	if err != nil {
+		switch {
+		case errors.Is(err, repository.ErrRoomBillNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": "room bill not found"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		}
+		return
+	}
+	c.JSON(http.StatusCreated, payment)
+}
