@@ -30,11 +30,11 @@ Use the returned URL in any later JSON payload. For example, room bill creation 
         "receiptImageUrl": "https://your-room-mate-bucket.s3.ap-southeast-1.amazonaws.com/uploads/images/<uuid>.jpg"
       }'
 
-The API validates that a bill receipt URL belongs to the configured S3 bucket and uses the generic uploads/images/ prefix. Older room-specific receipt URLs are still accepted.
+Room bills store the complete public image URL in receipt_image_url. The API validates that a new receipt URL belongs to the configured S3 bucket and uses the generic uploads/images/ prefix. Existing records that contain an S3 object key remain readable for backward compatibility.
 
 ### AWS configuration
 
-Set AWS_REGION and AWS_S3_BUCKET. The AWS SDK uses its standard credential chain (for local development, configure the AWS CLI profile or AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY; in production, prefer an IAM role). The application needs s3:PutObject for uploads/images/* and any feature-specific prefixes still in use.
+Set AWS_REGION and AWS_S3_BUCKET. The AWS SDK uses its standard credential chain (for local development, configure the AWS CLI profile or AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY; in production, prefer an IAM role). The application needs s3:PutObject for uploads/images/*.
 
 ### Public image access
 
