@@ -25,6 +25,8 @@ type Config struct {
 	ServerConfig    SERVERConfig
 	GoogleClientId  string
 	AppleClientId   string
+	AWSRegion       string
+	AWSS3Bucket     string
 }
 
 func LoadEnv() (*Config, error) {
@@ -46,5 +48,7 @@ func LoadEnv() (*Config, error) {
 		JWTSecret:      os.Getenv("JWT_SECRET"),
 		GoogleClientId: os.Getenv("GOOGLE_CLIENT_ID"),
 		AppleClientId:  os.Getenv("APPLE_CLIENT_ID"),
+		AWSRegion:      os.Getenv("AWS_REGION"),
+		AWSS3Bucket:    os.Getenv("AWS_S3_BUCKET"),
 	}, nil
 }

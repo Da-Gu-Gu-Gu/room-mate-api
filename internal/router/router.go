@@ -1,6 +1,7 @@
 package router
 
 import (
+	"context"
 	"log"
 
 	"room-mate-api/internal/config"
@@ -8,6 +9,7 @@ import (
 	"room-mate-api/internal/middleware"
 	"room-mate-api/internal/repository"
 	"room-mate-api/internal/service"
+	"room-mate-api/internal/storage"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -33,7 +35,6 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	roomMemberHandler := handler.NewRoomMemberHandler(roomMemberService)
 
 	googleAuth, err := service.NewGoogleAuthService(cfg.GoogleClientId)
-
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -49,9 +50,22 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	billService := service.NewBillService(billRepository)
 	billHandler := handler.NewBillHandler(billService)
 
+	var imageStorage service.ImageObjectStorage
+	var roomBillStorage service.RoomBillObjectStorage
+	if cfg.AWSRegion != "" && cfg.AWSS3Bucket != "" {
+		s3Storage, err := storage.NewS3Storage(context.Background(), cfg.AWSRegion, cfg.AWSS3Bucket)
+		if err != nil {
+			log.Fatal(err)
+		}
+		imageStorage = s3Storage
+		roomBillStorage = s3Storage
+	}
+
 	roomBillRepository := repository.NewRoomBillRepository(db)
-	roomBillService := service.NewRoomBillService(roomBillRepository)
+	roomBillService := service.NewRoomBillService(roomBillRepository, roomBillStorage)
 	roomBillHandler := handler.NewRoomBillHandler(roomBillService)
+	uploadService := service.NewUploadService(imageStorage)
+	uploadHandler := handler.NewUploadHandler(uploadService)
 
 	api := router.Group("/api/v1")
 	api.POST("/auth/google", authHandler.GoogleLogin)
@@ -74,6 +88,8 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		theme := protected.Group("/themes")
 		theme.GET("", themeHandler.GetThemes)
 
+		protected.POST("/uploads/images", uploadHandler.UploadImage)
+
 		room := protected.Group("/rooms")
 		{
 			room.POST("", roomHandler.CreateRoom)
@@ -85,18 +101,17 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			room.POST("/:id/transfer-ownership", roomMemberHandler.TransferOwnership)
 			room.POST("/:id/leave", roomMemberHandler.LeaveRoom)
 
-			//bill
+			// Bills
 			room.POST("/:id/bills", roomBillHandler.CreateRoomBill)
 			room.GET("/:id/bills", roomBillHandler.GetRoomBills)
 			room.GET("/:id/bills/:billId", roomBillHandler.GetRoomBillByID)
+			room.POST("/:id/bills/:billId/shares", roomBillHandler.CreateRoomBillShares)
 		}
 
-		// room-invitation
 		protected.GET("/invitations", roomMemberHandler.GetMyInvitations)
 		protected.POST("/invitations/:invitationId/accept", roomMemberHandler.AcceptInvitation)
 		protected.POST("/invitations/:invitationId/decline", roomMemberHandler.DeclineInvitation)
 
-		//bill-categories
 		protected.GET("/bill-categories", billHandler.GetBillCategories)
 	}
 
