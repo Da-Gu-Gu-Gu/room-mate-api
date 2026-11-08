@@ -27,7 +27,7 @@ type RoomBillRepository interface {
 	GetRoomBillById(roomID, userID, billID uuid.UUID) (*model.RoomBill, error)
 	CreateShares(roomID, billID, requesterID uuid.UUID, shares []model.RoomBillShare) ([]*model.RoomBillShare, error)
 	GETShares(roomID, billID, userID uuid.UUID) ([]*model.RoomBillShare, error)
-	CreatePayment(roomID, billShareID, userID uuid.UUID, payment *model.RoomBillPayment) (*model.RoomBillPayment, error)
+	CreatePayment(roomID, billID, userID uuid.UUID, payment *model.RoomBillPayment) (*model.RoomBillPayment, error)
 }
 
 type roomBillRepository struct {
@@ -58,6 +58,15 @@ func (r *roomBillRepository) CanCreate(roomID, userID uuid.UUID) error {
 		return errors.New("user not belong to this room, cannot create room bill")
 	}
 	return nil
+}
+
+func (r *roomBillRepository) CanCreatePayment(billID, shareId, userID uuid.UUID) (*model.RoomBillShare, error) {
+	var share *model.RoomBillShare
+	r.db.Model(&model.RoomBillShare{}).Where("bill_id = ? AND id = ? AND user_id = ?", billID, shareId, userID).First(&share)
+	if share.ID == uuid.Nil {
+		return nil, errors.New("share not found")
+	}
+	return share, nil
 }
 
 func (r *roomBillRepository) Create(roomBill *model.RoomBill) (*model.RoomBill, error) {
@@ -205,10 +214,38 @@ func (r *roomBillRepository) GETShares(roomID, billID, userID uuid.UUID) ([]*mod
 	return shares, nil
 }
 
-func (r *roomBillRepository) CreatePayment(roomID, billShareID, userID uuid.UUID, payment *model.RoomBillPayment) (*model.RoomBillPayment, error) {
+func (r *roomBillRepository) CreatePayment(roomID, billID, userID uuid.UUID, payment *model.RoomBillPayment) (*model.RoomBillPayment, error) {
 	if err := r.CanCreate(roomID, userID); err != nil {
 		return nil, err
 	}
+	share, err := r.CanCreatePayment(billID, payment.BillShareID, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	var totalPaidAmount float64
+
+	if err := r.db.Model(&model.RoomBillPayment{}).
+		Select("COALESCE(SUM(amount), 0)").
+		Where(
+			"bill_share_id = ? AND LOWER(status) IN ?",
+			payment.BillShareID,
+			[]string{"pending", "approved"},
+		).
+		Scan(&totalPaidAmount).Error; err != nil {
+		return nil, err
+	}
+
+	totalCents := int64(math.Round(share.Amount * 100))
+	totalPaidCents := int64(math.Round(totalPaidAmount * 100))
+	paymentCents := int64(math.Round(payment.Amount * 100)) //cuurent pay amount in cent
+
+	remainingCents := totalCents - totalPaidCents
+
+	if paymentCents <= 0 || paymentCents > remainingCents {
+		return nil, fmt.Errorf("invalid payment amount: must be greater than 0 and less than or equal to remaining amount of %.2f", float64(remainingCents)/100)
+	}
+
 	if err := r.db.Create(payment).Error; err != nil {
 		return nil, err
 	}

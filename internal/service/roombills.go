@@ -112,9 +112,10 @@ func (s *RoomBillService) GetRoomBillShares(roomID, billID, userID uuid.UUID) ([
 	return s.roomBillRepository.GETShares(roomID, billID, userID)
 }
 
-func (s *RoomBillService) CreateRoomBillPayment(roomID, billShareID, userID uuid.UUID, req *dto.CreateRoomBillPaymentRequest) (*model.RoomBillPayment, error) {
+func (s *RoomBillService) CreateRoomBillPayment(roomID, billID, userID uuid.UUID, req *dto.CreateRoomBillPaymentRequest) (*model.RoomBillPayment, error) {
 	var payment = &model.RoomBillPayment{
-		BillShareID: req.BillShareID, UserID: req.UserID, Status: "Pending", Note: req.Note, ProofURL: req.ProofURL, Amount: req.Amount,
+		BillShareID: req.BillShareID, UserID: userID, Status: "Pending", Note: req.Note, ProofURL: req.ProofURL, Amount: req.Amount,
 	}
-	return s.roomBillRepository.CreatePayment(roomID, billShareID, userID, payment)
+
+	return s.roomBillRepository.CreatePayment(roomID, billID, userID, payment)
 }

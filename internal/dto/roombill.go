@@ -29,8 +29,6 @@ type RoomBillShareItem struct {
 
 type CreateRoomBillPaymentRequest struct {
 	BillShareID uuid.UUID `json:"billShareId" binding:"required"`
-	UserID      uuid.UUID `json:"userId" binding:"required"`
-	Status      string    `json:"status" binding:"required"`
 	Note        *string   `json:"note"`
 	ProofURL    string    `json:"proofUrl" binding:"required"`
 	Amount      float64   `json:"amount" binding:"required,gt=0"`
