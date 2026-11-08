@@ -370,7 +370,7 @@ The members array must contain at least one item. Each item requires a userId an
 1. A member submits a payment against their own bill share through POST /api/v1/rooms/:id/bills/:billId/payments. The authenticated user is used as the payer; clients cannot choose the payer or initial status.
 2. The request includes billShareId, a positive amount, proofUrl, and an optional note. Partial payments are supported.
 3. The payment is created with pending status. Pending and approved amounts count toward the share's committed amount; rejected payments do not.
-4. The active room owner reviews the payment using the approve or reject endpoint. Other members receive HTTP 403.
+4. The creator of that bill reviews the payment using the approve or reject endpoint. Other users, including the room owner when they did not create the bill, receive HTTP 403.
 5. A review records reviewedBy and reviewedAt. Only pending payments can be reviewed; attempts to review an already approved or rejected payment return HTTP 409.
 6. Review is transactional and locks the bill and payment rows so concurrent review requests cannot both change the same pending payment.
 
