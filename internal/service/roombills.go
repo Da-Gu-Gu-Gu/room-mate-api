@@ -114,8 +114,18 @@ func (s *RoomBillService) GetRoomBillShares(roomID, billID, userID uuid.UUID) ([
 
 func (s *RoomBillService) CreateRoomBillPayment(roomID, billID, userID uuid.UUID, req *dto.CreateRoomBillPaymentRequest) (*model.RoomBillPayment, error) {
 	var payment = &model.RoomBillPayment{
-		BillShareID: req.BillShareID, UserID: userID, Status: "Pending", Note: req.Note, ProofURL: req.ProofURL, Amount: req.Amount,
+		BillShareID: req.BillShareID, UserID: userID, Status: "pending", Note: req.Note, ProofURL: req.ProofURL, Amount: req.Amount,
 	}
 
 	return s.roomBillRepository.CreatePayment(roomID, billID, userID, payment)
+}
+
+
+// ReviewRoomBillPayment approves or rejects a pending payment.
+func (s *RoomBillService) ReviewRoomBillPayment(roomID, billID, paymentID, reviewerID uuid.UUID, approved bool) (*model.RoomBillPayment, error) {
+	status := "rejected"
+	if approved {
+		status = "approved"
+	}
+	return s.roomBillRepository.ReviewPayment(roomID, billID, paymentID, reviewerID, status)
 }

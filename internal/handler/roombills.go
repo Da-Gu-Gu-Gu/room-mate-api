@@ -209,3 +209,55 @@ func (h *RoomBillHandler) CreateRoomBillPayment(c *gin.Context) {
 	}
 	c.JSON(http.StatusCreated, payment)
 }
+
+
+// ApproveRoomBillPayment approves a pending payment. Only the room owner
+// can perform this action.
+func (h *RoomBillHandler) ApproveRoomBillPayment(c *gin.Context) {
+	h.reviewRoomBillPayment(c, true)
+}
+
+// RejectRoomBillPayment rejects a pending payment. Only the room owner
+// can perform this action.
+func (h *RoomBillHandler) RejectRoomBillPayment(c *gin.Context) {
+	h.reviewRoomBillPayment(c, false)
+}
+
+func (h *RoomBillHandler) reviewRoomBillPayment(c *gin.Context, approved bool) {
+	roomID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid room ID"})
+		return
+	}
+	billID, err := uuid.Parse(c.Param("billId"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid bill ID"})
+		return
+	}
+	paymentID, err := uuid.Parse(c.Param("paymentId"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payment ID"})
+		return
+	}
+	reviewerID, ok := currentUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authenticated user"})
+		return
+	}
+
+	payment, err := h.roomBillService.ReviewRoomBillPayment(roomID, billID, paymentID, reviewerID, approved)
+	if err != nil {
+		switch {
+		case errors.Is(err, repository.ErrRoomBillNotFound), errors.Is(err, repository.ErrRoomBillPaymentNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": "room bill or payment not found"})
+		case errors.Is(err, repository.ErrRoomBillReviewForbidden):
+			c.JSON(http.StatusForbidden, gin.H{"error": "only the room owner can review payments"})
+		case errors.Is(err, repository.ErrRoomBillPaymentNotPending):
+			c.JSON(http.StatusConflict, gin.H{"error": "payment has already been reviewed"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		}
+		return
+	}
+	c.JSON(http.StatusOK, payment)
+}

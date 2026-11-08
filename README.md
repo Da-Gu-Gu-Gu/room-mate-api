@@ -300,6 +300,9 @@ The authenticated user is used as the inviter/requester; clients should not subm
 | GET | /api/v1/rooms/:id/bills | List bills in a room |
 | GET | /api/v1/rooms/:id/bills/:billId | Get one bill |
 | POST | /api/v1/rooms/:id/bills/:billId/shares | Assign member share amounts for a bill |
+| POST | /api/v1/rooms/:id/bills/:billId/payments | Submit a partial or full payment with proof | 
+| POST | /api/v1/rooms/:id/bills/:billId/payments/:paymentId/approve | Approve a pending payment (room owner only) |
+| POST | /api/v1/rooms/:id/bills/:billId/payments/:paymentId/reject | Reject a pending payment (room owner only) |
 
 Create bill request:
 
@@ -361,6 +364,18 @@ The members array must contain at least one item. Each item requires a userId an
 3. The client creates the bill and passes that URL as receiptImageUrl.
 4. The API verifies that the requester is an active member of the room and validates that the URL belongs to the configured S3 bucket and uploads/images/ prefix.
 5. The API creates the bill with pending status.
+
+### 5. Submit and review a bill payment
+
+1. A member submits a payment against their own bill share through POST /api/v1/rooms/:id/bills/:billId/payments. The authenticated user is used as the payer; clients cannot choose the payer or initial status.
+2. The request includes billShareId, a positive amount, proofUrl, and an optional note. Partial payments are supported.
+3. The payment is created with pending status. Pending and approved amounts count toward the share's committed amount; rejected payments do not.
+4. The active room owner reviews the payment using the approve or reject endpoint. Other members receive HTTP 403.
+5. A review records reviewedBy and reviewedAt. Only pending payments can be reviewed; attempts to review an already approved or rejected payment return HTTP 409.
+6. Review is transactional and locks the bill and payment rows so concurrent review requests cannot both change the same pending payment.
+
+Approval and rejection do not accept a client-supplied status or reviewer ID. Both values are determined by the authenticated request and server-side action.
+
 6. The client assigns each member's share through the bill shares endpoint. Amounts can be unequal, but must add up to the bill total.
 7. Active room members can retrieve the room's bills.
 
