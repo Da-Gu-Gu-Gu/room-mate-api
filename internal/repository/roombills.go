@@ -62,9 +62,9 @@ func (r *roomBillRepository) CanCreate(roomID, userID uuid.UUID) error {
 
 func (r *roomBillRepository) CanCreatePayment(billID, shareId, userID uuid.UUID) (*model.RoomBillShare, error) {
 	var share *model.RoomBillShare
-	r.db.Model(&model.RoomBillShare{}).Where("bill_id = ? AND id = ? AND user_id = ?", billID, shareId, userID).First(&share)
+	err := r.db.Model(&model.RoomBillShare{}).Where("bill_id = ? AND id = ? AND user_id = ?", billID, shareId, userID).First(&share).Error
 	if share.ID == uuid.Nil {
-		return nil, errors.New("share not found")
+		return nil, err
 	}
 	return share, nil
 }
