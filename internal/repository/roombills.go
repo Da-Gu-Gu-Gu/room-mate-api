@@ -259,7 +259,7 @@ func (r *roomBillRepository) CreatePayment(roomID, billID, userID uuid.UUID, pay
 }
 
 
-// ReviewPayment allows only the active room owner to approve or reject a
+// ReviewPayment allows only the bill creator to approve or reject a
 // pending payment. Locking the bill and payment rows serializes reviews.
 func (r *roomBillRepository) ReviewPayment(roomID, billID, paymentID, reviewerID uuid.UUID, status string) (*model.RoomBillPayment, error) {
 	var reviewedPayment model.RoomBillPayment
@@ -276,17 +276,8 @@ func (r *roomBillRepository) ReviewPayment(roomID, billID, paymentID, reviewerID
 				return err
 			}
 
-		// Review permission is intentionally restricted to the active owner.
-		var owner model.RoomMember
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("room_id = ? AND user_id = ? AND leave_at IS NULL", roomID, reviewerID).
-			First(&owner).Error; err != nil {
-				if errors.Is(err, gorm.ErrRecordNotFound) {
-					return ErrRoomBillReviewForbidden
-				}
-				return err
-			}
-		if owner.Role != model.RoleAdmin {
+		// The bill creator is responsible for reviewing payments on this bill.
+		if bill.CreatedBy != reviewerID {
 			return ErrRoomBillReviewForbidden
 		}
 
