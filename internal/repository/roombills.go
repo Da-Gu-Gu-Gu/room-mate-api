@@ -22,7 +22,7 @@ var (
 	ErrRoomBillSharesAlreadyAssigned = errors.New("shares have already been assigned for this bill")
 	ErrRoomBillPaymentNotFound       = errors.New("room bill payment not found")
 	ErrRoomBillPaymentNotPending     = errors.New("room bill payment is no longer pending")
-	ErrRoomBillReviewForbidden      = errors.New("only the active room owner can review payments")
+	ErrRoomBillReviewForbidden       = errors.New("only the active room owner can review payments")
 )
 
 type RoomBillRepository interface {
@@ -258,7 +258,6 @@ func (r *roomBillRepository) CreatePayment(roomID, billID, userID uuid.UUID, pay
 	return payment, nil
 }
 
-
 // ReviewPayment allows only the active room owner to approve or reject a
 // pending payment. Locking the bill and payment rows serializes reviews.
 func (r *roomBillRepository) ReviewPayment(roomID, billID, paymentID, reviewerID uuid.UUID, status string) (*model.RoomBillPayment, error) {
@@ -270,23 +269,14 @@ func (r *roomBillRepository) ReviewPayment(roomID, billID, paymentID, reviewerID
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 			Where("id = ? AND room_id = ?", billID, roomID).
 			First(&bill).Error; err != nil {
-				if errors.Is(err, gorm.ErrRecordNotFound) {
-					return ErrRoomBillNotFound
-				}
-				return err
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrRoomBillNotFound
 			}
+			return err
+		}
 
-		// Review permission is intentionally restricted to the active owner.
-		var owner model.RoomMember
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("room_id = ? AND user_id = ? AND leave_at IS NULL", roomID, reviewerID).
-			First(&owner).Error; err != nil {
-				if errors.Is(err, gorm.ErrRecordNotFound) {
-					return ErrRoomBillReviewForbidden
-				}
-				return err
-			}
-		if owner.Role != model.RoleAdmin {
+		// Review permission is intentionally restricted to the bill creator.
+		if reviewerID != bill.CreatedBy {
 			return ErrRoomBillReviewForbidden
 		}
 
