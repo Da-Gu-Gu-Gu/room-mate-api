@@ -17,7 +17,7 @@ type RoomBillShare struct {
 	RemainingAmount float64   `json:"remainingAmount" gorm:"-"`
 	PaymentStatus   string    `json:"paymentStatus" gorm:"-"`
 	CreatedAt       time.Time `json:"createdAt" gorm:"autoCreateTime"`
-	UpdatedAt time.Time `json:"updatedAt" gorm:"autoUpdateTime"`
+	UpdatedAt       time.Time `json:"updatedAt" gorm:"autoUpdateTime"`
 
 	Bill RoomBill `json:"-" gorm:"foreignKey:BillID;references:ID"`
 	User User     `json:"user" gorm:"foreignKey:UserID;references:ID"`
