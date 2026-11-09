@@ -159,7 +159,6 @@ Notable migrations include:
 - 000012: bill categories, room bills, member shares, and room bill payments.
 - 000013: legacy room bill receipt image object-key column.
 - 000014: room bill receipt image URL column for new records.
-- 000014: room bill receipt image URL column.
 
 Do not edit migrations that have already been applied to a database. Add a new paired up/down migration for future schema changes.
 
@@ -370,7 +369,7 @@ The members array must contain at least one item. Each item requires a userId an
 ### 2. Create a room and invite housemates
 
 1. An authenticated user creates a room with roomName and roomNumber.
-2. The API uses the authenticated user as the creator/owner and creates the initial active membership with the owner role.
+2. The API uses the authenticated user as the creator/owner and creates the initial active membership with the admin/owner role.
 3. The room owner invites an existing user using the room invitation endpoint.
 4. The invitee checks their invitations.
 5. The invitee accepts or declines the invitation.
@@ -382,7 +381,7 @@ The members array must contain at least one item. Each item requires a userId an
 2. The client creates the bill and may pass that URL as receiptImageUrl. The API verifies that the requester is an active room member and validates that the URL belongs to the configured S3 bucket and uploads/images/ prefix. The bill is created with pending status; the request DTO's optional status field is currently ignored by the service.
 3. The client assigns member shares through POST /api/v1/rooms/:id/bills/:billId/shares. Each selected user must be an active member, amounts must be positive and unique per user, and the sum must equal the bill total. Assignment is one-time per bill.
 4. A member submits a payment against their own share through POST /api/v1/rooms/:id/bills/:billId/payments. The request includes billShareId, a positive amount, proofUrl, and an optional note. The authenticated user is used as the payer. Partial payments are supported, and the amount cannot exceed the remaining share amount calculated from existing pending and approved payments.
-   
+
    Example payment request:
 
    ~~~json
@@ -407,7 +406,7 @@ The members array must contain at least one item. Each item requires a userId an
 3. The owner must transfer ownership to another active member before leaving.
 4. Ownership transfer updates the room owner and member roles.
 5. Room deletion is a separate operation restricted to the current room creator/owner.
- 
+
 ## Image uploads and S3
 
 The generic image endpoint can be reused by features that need an image URL. It requires authentication but does not require the user to belong to a room.
