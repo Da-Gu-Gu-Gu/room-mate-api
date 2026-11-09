@@ -10,8 +10,13 @@ type RoomBillShare struct {
 	ID        uuid.UUID `json:"id" gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
 	BillID    uuid.UUID `json:"billId" gorm:"type:uuid;not null;uniqueIndex:uq_room_bill_shares_bill_user"`
 	UserID    uuid.UUID `json:"userId" gorm:"type:uuid;not null;uniqueIndex:uq_room_bill_shares_bill_user"`
-	Amount    float64   `json:"amount" gorm:"type:numeric(12,2);not null;check:amount >= 0"`
-	CreatedAt time.Time `json:"createdAt" gorm:"autoCreateTime"`
+	Amount          float64   `json:"amount" gorm:"type:numeric(12,2);not null;check:amount >= 0"`
+	ShareAmount     float64   `json:"shareAmount" gorm:"-"`
+	ApprovedAmount  float64   `json:"approvedAmount" gorm:"-"`
+	PendingAmount   float64   `json:"pendingAmount" gorm:"-"`
+	RemainingAmount float64   `json:"remainingAmount" gorm:"-"`
+	PaymentStatus   string    `json:"paymentStatus" gorm:"-"`
+	CreatedAt       time.Time `json:"createdAt" gorm:"autoCreateTime"`
 	UpdatedAt time.Time `json:"updatedAt" gorm:"autoUpdateTime"`
 
 	Bill RoomBill `json:"-" gorm:"foreignKey:BillID;references:ID"`
