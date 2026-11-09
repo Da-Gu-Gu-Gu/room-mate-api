@@ -193,6 +193,9 @@ func (r *roomBillRepository) CreateShares(roomID, billID, requesterID uuid.UUID,
 			if err := tx.Create(&share).Error; err != nil {
 				return err
 			}
+			share.ShareAmount = share.Amount
+			share.RemainingAmount = share.Amount
+			share.PaymentStatus = "unpaid"
 			createdShares = append(createdShares, &share)
 		}
 		return nil
@@ -205,21 +208,86 @@ func (r *roomBillRepository) CreateShares(roomID, billID, requesterID uuid.UUID,
 }
 
 func (r *roomBillRepository) GETShares(roomID, billID, userID uuid.UUID) ([]*model.RoomBillShare, error) {
+	// Verify the bill belongs to the room in the URL before exposing its shares.
+	var bill model.RoomBill
+	if err := r.db.Select("id").
+		Where("id = ? AND room_id = ?", billID, roomID).
+		First(&bill).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrRoomBillNotFound
+		}
+		return nil, err
+	}
+
 	ok, err := r.isBelongToRoom(roomID, userID)
 	if err != nil {
 		return nil, err
 	}
 	if !ok {
-		return nil, errors.New("user not belong to this room, cannot get room bill shares")
+		return nil, ErrRoomBillShareForbidden
 	}
 
 	var shares []*model.RoomBillShare
-	if err := r.db.Where("bill_id = ?", billID).Find(&shares).Error; err != nil {
+	if err := r.db.Preload("User").
+		Where("bill_id = ?", billID).
+		Order("created_at ASC").
+		Find(&shares).Error; err != nil {
 		return nil, err
 	}
+
+	// Aggregate payments in one query instead of issuing one query per member.
+	type paymentTotals struct {
+		BillShareID    uuid.UUID
+		ApprovedAmount float64
+		PendingAmount  float64
+	}
+	totalsByShareID := make(map[uuid.UUID]paymentTotals, len(shares))
+	if len(shares) > 0 {
+		shareIDs := make([]uuid.UUID, 0, len(shares))
+		for _, share := range shares {
+			shareIDs = append(shareIDs, share.ID)
+		}
+
+		var totals []paymentTotals
+		if err := r.db.Model(&model.RoomBillPayment{}).
+			Select("bill_share_id, COALESCE(SUM(CASE WHEN LOWER(status) = 'approved' THEN amount ELSE 0 END), 0) AS approved_amount, COALESCE(SUM(CASE WHEN LOWER(status) = 'pending' THEN amount ELSE 0 END), 0) AS pending_amount").
+			Where("bill_share_id IN ?", shareIDs).
+			Group("bill_share_id").
+			Scan(&totals).Error; err != nil {
+			return nil, err
+		}
+		for _, total := range totals {
+			totalsByShareID[total.BillShareID] = total
+		}
+	}
+
+	for _, share := range shares {
+		total := totalsByShareID[share.ID]
+		shareCents := int64(math.Round(share.Amount * 100))
+		approvedCents := int64(math.Round(total.ApprovedAmount * 100))
+		pendingCents := int64(math.Round(total.PendingAmount * 100))
+		remainingCents := shareCents - approvedCents
+		if remainingCents < 0 {
+			remainingCents = 0
+		}
+
+		share.ShareAmount = float64(shareCents) / 100
+		share.ApprovedAmount = float64(approvedCents) / 100
+		share.PendingAmount = float64(pendingCents) / 100
+		share.RemainingAmount = float64(remainingCents) / 100
+
+		switch {
+		case approvedCents == 0:
+			share.PaymentStatus = "unpaid"
+		case approvedCents < shareCents:
+			share.PaymentStatus = "partially_paid"
+		default:
+			share.PaymentStatus = "paid"
+		}
+	}
+
 	return shares, nil
 }
-
 func (r *roomBillRepository) CreatePayment(roomID, billID, userID uuid.UUID, payment *model.RoomBillPayment) (*model.RoomBillPayment, error) {
 	if err := r.CanCreate(roomID, userID); err != nil {
 		return nil, err
