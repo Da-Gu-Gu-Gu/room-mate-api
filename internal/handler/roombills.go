@@ -211,13 +211,13 @@ func (h *RoomBillHandler) CreateRoomBillPayment(c *gin.Context) {
 }
 
 
-// ApproveRoomBillPayment approves a pending payment. Only the room owner
+// ApproveRoomBillPayment approves a pending payment. Only the bill creator
 // can perform this action.
 func (h *RoomBillHandler) ApproveRoomBillPayment(c *gin.Context) {
 	h.reviewRoomBillPayment(c, true)
 }
 
-// RejectRoomBillPayment rejects a pending payment. Only the room owner
+// RejectRoomBillPayment rejects a pending payment. Only the bill creator
 // can perform this action.
 func (h *RoomBillHandler) RejectRoomBillPayment(c *gin.Context) {
 	h.reviewRoomBillPayment(c, false)
@@ -251,7 +251,7 @@ func (h *RoomBillHandler) reviewRoomBillPayment(c *gin.Context, approved bool) {
 		case errors.Is(err, repository.ErrRoomBillNotFound), errors.Is(err, repository.ErrRoomBillPaymentNotFound):
 			c.JSON(http.StatusNotFound, gin.H{"error": "room bill or payment not found"})
 		case errors.Is(err, repository.ErrRoomBillReviewForbidden):
-			c.JSON(http.StatusForbidden, gin.H{"error": "only the room owner can review payments"})
+			c.JSON(http.StatusForbidden, gin.H{"error": "only the bill creator can review payments"})
 		case errors.Is(err, repository.ErrRoomBillPaymentNotPending):
 			c.JSON(http.StatusConflict, gin.H{"error": "payment has already been reviewed"})
 		default:
