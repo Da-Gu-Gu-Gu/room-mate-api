@@ -156,8 +156,9 @@ Current schema concepts include:
 Notable migrations include:
 
 - 000011: room membership lifecycle constraints, including at most one active room per user and unique room codes/pending invitations.
-- 000013: room bill receipt image object-key column for legacy records.
-- 000014: room bill receipt image URL column.
+- 000012: bill categories, room bills, member shares, and room bill payments.
+- 000013: legacy room bill receipt image object-key column.
+- 000014: room bill receipt image URL column for new records.
 
 Do not edit migrations that have already been applied to a database. Add a new paired up/down migration for future schema changes.
 
@@ -199,6 +200,23 @@ Social login request body for either provider:
 ~~~
 
 The API requires a verified email from the provider. For a new provider identity, it creates a user and auth identity in a database transaction. Existing provider identities resolve to their linked user. A successful login returns an access token, Bearer token type, and user data. The JWT is signed with HS256 and expires after 24 hours.
+
+The current `AuthResponse` DTO does not define JSON tags for its top-level fields, so the response keys are `AccessToken`, `TokenType`, and `User` (not camelCase). The nested user fields use their `UserResponse` JSON tags. Google login includes `createdAt` and `updatedAt`; the Apple handler currently omits those two fields.
+
+Example response shape:
+
+~~~json
+{
+  "AccessToken": "<room-mate-jwt>",
+  "TokenType": "Bearer",
+  "User": {
+    "id": "<user-uuid>",
+    "name": "Alex",
+    "email": "alex@example.com",
+    "profileUrl": "https://example.com/profile.jpg"
+  }
+}
+~~~
 
 ### Current user and profile
 
@@ -337,7 +355,7 @@ Assign bill shares request:
 }
 ~~~
 
-The members array must contain at least one item. Each item requires a userId and a positive amount. Share amounts may differ between members, but the sum must equal the bill total. Each user must be an active member of the room; duplicate users are rejected. Shares can only be assigned once per bill. The repository inserts all share rows in one transaction, so the operation succeeds or rolls back as a unit.
+The members array must contain at least one item. Each item requires a userId and a positive amount. Share amounts may differ between members, but the sum must equal the bill total (compared in cents). Each user must be an active member of the room; duplicate users are rejected. Shares can only be assigned once per bill. The repository inserts all share rows in one transaction, so the operation succeeds or rolls back as a unit. A successful response is wrapped as `{ "members": [...] }`.
 
 Get member shares:
 
@@ -360,21 +378,20 @@ The bill must belong to the room in :id, and the authenticated requester must be
 ### 2. Create a room and invite housemates
 
 1. An authenticated user creates a room with roomName and roomNumber.
-2. The API uses the authenticated user as the creator and creates the room membership.
-3. The owner invites an existing user using the room invitation endpoint.
+2. The API uses the authenticated user as the creator/owner and creates the initial active membership with the admin/owner role.
+3. The room owner invites an existing user using the room invitation endpoint.
 4. The invitee checks their invitations.
 5. The invitee accepts or declines the invitation.
 6. On acceptance, the invitee joins the room if they do not already have an active room membership.
 
-### 3. Create a bill and split it
+### 3. Create a bill, assign shares, and submit payments
 
-1. If a receipt exists, the client uploads it through POST /api/v1/uploads/images.
-2. The API validates the image and returns a permanent imageUrl.
-3. The client creates the bill and passes that URL as receiptImageUrl.
-4. The API verifies that the requester is an active member of the room and validates that the URL belongs to the configured S3 bucket and uploads/images/ prefix.
-5. The API creates the bill with pending status.
+1. If the bill has a receipt image, the client uploads it through POST /api/v1/uploads/images and receives a permanent imageUrl.
+2. The client creates the bill and may pass that URL as receiptImageUrl. The API verifies that the requester is an active room member and validates that the URL belongs to the configured S3 bucket and uploads/images/ prefix. The bill is created with pending status; the request DTO's optional status field is currently ignored by the service.
+3. The client assigns member shares through POST /api/v1/rooms/:id/bills/:billId/shares. Each selected user must be an active member, amounts must be positive and unique per user, and the sum must equal the bill total. Assignment is one-time per bill.
+4. A member submits a payment against their own share through POST /api/v1/rooms/:id/bills/:billId/payments. The request includes billShareId, a positive amount, proofUrl, and an optional note. The authenticated user is used as the payer. Partial payments are supported, and the amount cannot exceed the remaining share amount calculated from existing pending and approved payments.
 
-### 5. Submit and review a bill payment
+   Example payment request:
 
 1. A member submits a payment against their own bill share through POST /api/v1/rooms/:id/bills/:billId/payments. The authenticated user is used as the payer; clients cannot choose the payer or initial status.
 2. The request includes billShareId, a positive amount, proofUrl, and an optional note. Partial payments are supported.
@@ -383,10 +400,11 @@ The bill must belong to the room in :id, and the authenticated requester must be
 5. A review records reviewedBy and reviewedAt. Only pending payments can be reviewed; attempts to review an already approved or rejected payment return HTTP 409.
 6. Review is transactional and locks the bill and payment rows so concurrent review requests cannot both change the same pending payment.
 
-Approval and rejection do not accept a client-supplied status or reviewer ID. Both values are determined by the authenticated request and server-side action.
+5. The payment is created with pending status. Rejected payments do not count toward the committed share amount.
+6. The active room owner (the active room membership with the owner/admin role) reviews the pending payment using the approve or reject endpoint. A bill creator who is not the room owner cannot review it; other non-owner users receive HTTP 403. Review endpoints do not require a request body.
+7. A review records reviewedBy and reviewedAt. Only pending payments can be reviewed; attempts to review an already approved or rejected payment return HTTP 409. Review is transactional and locks the bill and payment rows so concurrent review requests cannot both change the same pending payment.
 
-6. The client assigns each member's share through the bill shares endpoint. Amounts can be unequal, but must add up to the bill total.
-7. Active room members can retrieve the room's bills.
+**Current read-endpoint limitation:** the router does not currently register a GET route for bill shares, and it does not expose a GET/list/detail route for payments. Although a GetRoomBillShares handler method exists, it is not wired into the router. The bill GET endpoint returns the bill record, not its payment history. Therefore, members (including the bill creator) cannot currently fetch approved/rejected payment records through a dedicated read endpoint; the review response is returned only to the room owner who performed the review.
 
 ### 4. Leave a room or transfer ownership
 
@@ -394,7 +412,7 @@ Approval and rejection do not accept a client-supplied status or reviewer ID. Bo
 2. Leaving closes the active membership by setting leave_at; membership history is retained.
 3. The owner must transfer ownership to another active member before leaving.
 4. Ownership transfer updates the room owner and member roles.
-5. Room deletion is a separate creator-authorized operation.
+5. Room deletion is a separate operation restricted to the current room creator/owner.
 
 ## Image uploads and S3
 
