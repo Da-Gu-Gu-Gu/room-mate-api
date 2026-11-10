@@ -318,9 +318,10 @@ The authenticated user is used as the inviter/requester; clients should not subm
 | GET | /api/v1/rooms/:id/bills | List bills in a room |
 | GET | /api/v1/rooms/:id/bills/:billId | Get one bill |
 | POST | /api/v1/rooms/:id/bills/:billId/shares | Assign member share amounts for a bill |
+| GET | /api/v1/rooms/:id/bills/:billId/shares | List member shares with payment summaries |
 | POST | /api/v1/rooms/:id/bills/:billId/payments | Submit a partial or full payment with proof | 
-| POST | /api/v1/rooms/:id/bills/:billId/payments/:paymentId/approve | Approve a pending payment (room owner only) |
-| POST | /api/v1/rooms/:id/bills/:billId/payments/:paymentId/reject | Reject a pending payment (room owner only) |
+| POST | /api/v1/rooms/:id/bills/:billId/payments/:paymentId/approve | Approve a pending payment (bill creator only) |
+| POST | /api/v1/rooms/:id/bills/:billId/payments/:paymentId/reject | Reject a pending payment (bill creator only) |
 
 Create bill request:
 
@@ -356,6 +357,14 @@ Assign bill shares request:
 
 The members array must contain at least one item. Each item requires a userId and a positive amount. Share amounts may differ between members, but the sum must equal the bill total (compared in cents). Each user must be an active member of the room; duplicate users are rejected. Shares can only be assigned once per bill. The repository inserts all share rows in one transaction, so the operation succeeds or rolls back as a unit. A successful response is wrapped as `{ "members": [...] }`.
 
+Get member shares:
+
+~~~http
+GET /api/v1/rooms/:id/bills/:billId/shares
+~~~
+
+The bill must belong to the room in :id, and the authenticated requester must be an active member of that room. The response contains a members array. Each member includes shareAmount, approvedAmount, pendingAmount, remainingAmount, and paymentStatus alongside the existing share and user fields. approvedAmount sums approved payments only; pendingAmount sums pending submissions separately. remainingAmount is shareAmount minus approvedAmount, so pending and rejected payments never reduce the outstanding balance. paymentStatus is unpaid when no payment has been approved, partially_paid when some but not all of the share is approved, and paid when the full share is approved.
+
 ## Application flows
 
 ### 1. Sign in
@@ -384,14 +393,12 @@ The members array must contain at least one item. Each item requires a userId an
 
    Example payment request:
 
-   ~~~json
-   {
-     "billShareId": "<bill-share-uuid>",
-     "amount": 250,
-     "proofUrl": "https://example.com/payment-proof.jpg",
-     "note": "Partial payment"
-   }
-   ~~~
+1. A member submits a payment against their own bill share through POST /api/v1/rooms/:id/bills/:billId/payments. The authenticated user is used as the payer; clients cannot choose the payer or initial status.
+2. The request includes billShareId, a positive amount, proofUrl, and an optional note. Partial payments are supported.
+3. The payment is created with pending status. Pending and approved amounts count toward the share's committed amount; rejected payments do not.
+4. The bill creator reviews the payment using the approve or reject endpoint. Other members receive HTTP 403.
+5. A review records reviewedBy and reviewedAt. Only pending payments can be reviewed; attempts to review an already approved or rejected payment return HTTP 409.
+6. Review is transactional and locks the bill and payment rows so concurrent review requests cannot both change the same pending payment.
 
 5. The payment is created with pending status. Rejected payments do not count toward the committed share amount.
 6. The active room owner (the active room membership with the owner/admin role) reviews the pending payment using the approve or reject endpoint. A bill creator who is not the room owner cannot review it; other non-owner users receive HTTP 403. Review endpoints do not require a request body.

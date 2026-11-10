@@ -106,6 +106,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			room.GET("/:id/bills", roomBillHandler.GetRoomBills)
 			room.GET("/:id/bills/:billId", roomBillHandler.GetRoomBillByID)
 			room.POST("/:id/bills/:billId/shares", roomBillHandler.CreateRoomBillShares)
+			room.GET("/:id/bills/:billId/shares", roomBillHandler.GetRoomBillShares)
 			room.POST("/:id/bills/:billId/payments", roomBillHandler.CreateRoomBillPayment)
 			room.POST("/:id/bills/:billId/payments/:paymentId/approve", roomBillHandler.ApproveRoomBillPayment)
 			room.POST("/:id/bills/:billId/payments/:paymentId/reject", roomBillHandler.RejectRoomBillPayment)
