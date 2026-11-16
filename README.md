@@ -142,7 +142,7 @@ AWS credentials are loaded through the AWS SDK's default credential chain. For l
 
 ## Database and migrations
 
-SQL migrations are stored in migrations/ and applied in version order. Use make migrate-up to apply pending migrations and make migrate-down to roll back one migration step.
+SQL migrations are stored in migrations/ and applied in version order. Use `make migrate-up` to apply pending migrations and `make migrate-down` to roll back one migration step. These Makefile targets use the fixed local DSN `postgresql://user:password@localhost:5432/roommate?sslmode=disable`; they do not read the `DATABASE_*` values from `.env`. For a different database, run the `migrate` CLI with the intended DSN.
 
 Current schema concepts include:
 
@@ -363,7 +363,7 @@ Get member shares:
 GET /api/v1/rooms/:id/bills/:billId/shares
 ~~~
 
-The bill must belong to the room in :id, and the authenticated requester must be an active member of that room. The response contains a members array. Each member includes shareAmount, approvedAmount, pendingAmount, remainingAmount, and paymentStatus alongside the existing share and user fields. approvedAmount sums approved payments only; pendingAmount sums pending submissions separately. remainingAmount is shareAmount minus approvedAmount, so pending and rejected payments never reduce the outstanding balance. paymentStatus is unpaid when no payment has been approved, partially_paid when some but not all of the share is approved, and paid when the full share is approved.
+The bill must belong to the room in `:id`, and the authenticated requester must be an active member of that room. The response contains a `members` array. Each member includes `shareAmount`, `approvedAmount`, `pendingAmount`, `remainingAmount`, and `paymentStatus` alongside the stored share and nested user fields. `approvedAmount` sums approved payments only; `pendingAmount` sums pending submissions; rejected payments are excluded. `remainingAmount` is the share amount minus approved payments only, so pending amounts are shown separately rather than subtracted from this response field. `paymentStatus` is based on approved payments: `unpaid` when none are approved, `partially_paid` when some but not all of the share is approved, and `paid` when the full share is approved. When submitting another payment, the API separately reserves both pending and approved amounts when checking the amount against the share balance. This endpoint returns aggregate summaries, not individual payment history.
 
 ## Application flows
 
@@ -386,25 +386,25 @@ The bill must belong to the room in :id, and the authenticated requester must be
 
 ### 3. Create a bill, assign shares, and submit payments
 
-1. If the bill has a receipt image, the client uploads it through POST /api/v1/uploads/images and receives a permanent imageUrl.
-2. The client creates the bill and may pass that URL as receiptImageUrl. The API verifies that the requester is an active room member and validates that the URL belongs to the configured S3 bucket and uploads/images/ prefix. The bill is created with pending status; the request DTO's optional status field is currently ignored by the service.
-3. The client assigns member shares through POST /api/v1/rooms/:id/bills/:billId/shares. Each selected user must be an active member, amounts must be positive and unique per user, and the sum must equal the bill total. Assignment is one-time per bill.
-4. A member submits a payment against their own share through POST /api/v1/rooms/:id/bills/:billId/payments. The request includes billShareId, a positive amount, proofUrl, and an optional note. The authenticated user is used as the payer. Partial payments are supported, and the amount cannot exceed the remaining share amount calculated from existing pending and approved payments.
+1. If the bill has a receipt image, the client uploads it through `POST /api/v1/uploads/images` and receives a permanent `imageUrl`.
+2. The client creates the bill through `POST /api/v1/rooms/:id/bills`. The authenticated user must be an active member of the room. The client can pass the uploaded URL as `receiptImageUrl`; the service validates that it belongs to the configured S3 bucket and uses the `uploads/images/` prefix. New bills are created with `pending` status; the request DTO's optional `status` field is currently ignored.
+3. The client assigns shares through `POST /api/v1/rooms/:id/bills/:billId/shares`. The requester and every selected user must be active room members. Amounts must be positive, users must be unique, and the sum must equal the bill total to the cent. Shares can be assigned only once per bill; the insert is transactional.
+4. A member submits a payment against their own share through `POST /api/v1/rooms/:id/bills/:billId/payments`.
 
    Example payment request:
 
-1. A member submits a payment against their own bill share through POST /api/v1/rooms/:id/bills/:billId/payments. The authenticated user is used as the payer; clients cannot choose the payer or initial status.
-2. The request includes billShareId, a positive amount, proofUrl, and an optional note. Partial payments are supported.
-3. The payment is created with pending status. Pending and approved amounts count toward the share's committed amount; rejected payments do not.
-4. The bill creator reviews the payment using the approve or reject endpoint. Other members receive HTTP 403.
-5. A review records reviewedBy and reviewedAt. Only pending payments can be reviewed; attempts to review an already approved or rejected payment return HTTP 409.
-6. Review is transactional and locks the bill and payment rows so concurrent review requests cannot both change the same pending payment.
+   ~~~json
+   {
+     "billShareId": "<bill-share-uuid>",
+     "amount": 100,
+     "proofUrl": "https://example.com/payment-proof.jpg",
+     "note": "Paid by bank transfer"
+   }
+   ~~~
 
-5. The payment is created with pending status. Rejected payments do not count toward the committed share amount.
-6. The active room owner (the active room membership with the owner/admin role) reviews the pending payment using the approve or reject endpoint. A bill creator who is not the room owner cannot review it; other non-owner users receive HTTP 403. Review endpoints do not require a request body.
-7. A review records reviewedBy and reviewedAt. Only pending payments can be reviewed; attempts to review an already approved or rejected payment return HTTP 409. Review is transactional and locks the bill and payment rows so concurrent review requests cannot both change the same pending payment.
-
-**Current read-endpoint limitation:** the router does not currently register a GET route for bill shares, and it does not expose a GET/list/detail route for payments. Although a GetRoomBillShares handler method exists, it is not wired into the router. The bill GET endpoint returns the bill record, not its payment history. Therefore, members (including the bill creator) cannot currently fetch approved/rejected payment records through a dedicated read endpoint; the review response is returned only to the room owner who performed the review.
+   The payer ID is taken from the authenticated JWT, not from the request body, and the selected share must belong to that user. `billShareId`, `proofUrl`, and a positive `amount` are required; `note` is optional. The endpoint creates the payment with `pending` status. Before inserting, it sums the share's existing pending and approved payments and rejects an amount that exceeds the remaining balance; rejected payments are excluded. This sum check and insert are currently separate operations without a transaction or row lock, so concurrent submissions are not serialized by this path. The current payment handler requires `proofUrl` as a non-empty string but does not validate it against the configured S3 bucket or the `uploads/images/` prefix.
+5. The bill creator approves or rejects a pending payment using `POST /api/v1/rooms/:id/bills/:billId/payments/:paymentId/approve` or `POST /api/v1/rooms/:id/bills/:billId/payments/:paymentId/reject`. Permission is based on `room_bills.created_by`, not room ownership: a room owner who did not create the bill cannot review it. Review requests have no JSON body. A successful review returns the updated payment; non-creators receive HTTP 403, and a payment that is no longer pending returns HTTP 409. The repository performs the review in a transaction and locks the bill and payment rows.
+6. Members can retrieve share-level payment summaries using `GET /api/v1/rooms/:id/bills/:billId/shares`. This endpoint returns approved, pending, and remaining amounts plus an aggregate payment status for each share. There is currently no separate GET/list/detail endpoint for individual payment records, so the API does not expose the full payment history.
 
 ### 4. Leave a room or transfer ownership
 
