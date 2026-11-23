@@ -201,7 +201,7 @@ Social login request body for either provider:
 
 The API requires a verified email from the provider. For a new provider identity, it creates a user and auth identity in a database transaction. Existing provider identities resolve to their linked user. A successful login returns an access token, Bearer token type, and user data. The JWT is signed with HS256 and expires after 24 hours.
 
-The current `AuthResponse` DTO does not define JSON tags for its top-level fields, so the response keys are `AccessToken`, `TokenType`, and `User` (not camelCase). The nested user fields use their `UserResponse` JSON tags. Google login includes `createdAt` and `updatedAt`; the Apple handler currently omits those two fields.
+The current `AuthResponse` DTO does not define JSON tags for its top-level fields, so the response keys are `AccessToken`, `TokenType`, and `User` (not camelCase). The nested user fields use their `UserResponse` JSON tags.
 
 Example response shape:
 
