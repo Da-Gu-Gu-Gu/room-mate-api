@@ -61,6 +61,8 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		roomBillStorage = s3Storage
 	}
 
+	taskHandler := handler.NewTaskHandler(service.NewTaskService(repository.NewTaskRepository(db)))
+
 	roomBillRepository := repository.NewRoomBillRepository(db)
 	roomBillService := service.NewRoomBillService(roomBillRepository, roomBillStorage)
 	roomBillHandler := handler.NewRoomBillHandler(roomBillService)
@@ -100,6 +102,15 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			room.POST("/:id/invitations", roomMemberHandler.Invite)
 			room.POST("/:id/transfer-ownership", roomMemberHandler.TransferOwnership)
 			room.POST("/:id/leave", roomMemberHandler.LeaveRoom)
+
+			// Tasks
+			room.POST("/:id/tasks", taskHandler.Create)
+			room.GET("/:id/tasks", taskHandler.List)
+			room.GET("/:id/tasks/:taskId", taskHandler.Get)
+			room.GET("/:id/tasks/:taskId/occurrences", taskHandler.Occurrences)
+			room.POST("/:id/tasks/:taskId/occurrences/:occurrenceId/complete", taskHandler.Complete)
+			room.PATCH("/:id/tasks/:taskId/status", taskHandler.Status)
+			room.PUT("/:id/tasks/:taskId/members", taskHandler.Members)
 
 			// Bills
 			room.POST("/:id/bills", roomBillHandler.CreateRoomBill)
