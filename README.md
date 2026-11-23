@@ -501,3 +501,74 @@ S3 Block Public Access settings must permit the policy if public reads are requi
 | make migrate-down | Roll back one migration step |
 | make tidy | Run go mod tidy |
 
+
+## Tasks
+
+Apply migration `000015_tasks` before starting the updated server. Tasks use
+`tasks`, `task_members`, and `task_occurrences`. Each occurrence stores a single
+completion with an optional HTTPS `proofUrl`.
+
+All task endpoints require the existing bearer token and active room membership.
+The task creator or room owner can change status and replace the rotation roster.
+
+| Method | Path under `/api/v1` | Purpose |
+| --- | --- | --- |
+| POST | `/rooms/:id/tasks` | Create a task and its first occurrence |
+| GET | `/rooms/:id/tasks` | List tasks |
+| GET | `/rooms/:id/tasks/:taskId` | Get a task and ordered rotation members |
+| GET | `/rooms/:id/tasks/:taskId/occurrences` | Get scheduled turns and completion history |
+| POST | `/rooms/:id/tasks/:taskId/occurrences/:occurrenceId/complete` | Complete or cover a pending turn |
+| PATCH | `/rooms/:id/tasks/:taskId/status` | Set active, paused, or archived |
+| PUT | `/rooms/:id/tasks/:taskId/members` | Replace a recurring task's ordered roster |
+
+List endpoints accept `limit` (1–100, default 50) and `offset` (default 0).
+Occurrence history is returned newest deadline first.
+
+Example recurring task request, using real room membership IDs from the room's
+members endpoint and a future deadline:
+
+```json
+{
+  "name": "Clean the kitchen",
+  "description": "Wipe counters and mop the floor",
+  "scheduleType": "recurring",
+  "firstDueAt": "2027-01-03T20:00:00+07:00",
+  "frequency": "weekly",
+  "timezone": "Asia/Bangkok",
+  "repeatUntil": null,
+  "gracePeriodMinutes": 1440,
+  "memberIds": ["<first-room-member-id>", "<second-room-member-id>"]
+}
+```
+
+For a one-time task, use `scheduleType: "one_time"`, exactly one member, and omit
+`frequency` and `repeatUntil`. Daily and weekly recurrence follow calendar days
+in the supplied IANA time zone. The cutoff includes a turn due at `repeatUntil`.
+The grace period defaults to 24 hours and accepts 0–10080 minutes.
+
+The server runs the scheduler immediately at startup and every minute. It creates
+turns up to seven days ahead in bounded batches, skipping departed members when
+assigning new turns. Each task's cursor and new occurrences are committed together
+under a row lock. Rotation advances per scheduled turn, including missed turns.
+A task with no eligible members is paused. Its creator or room owner can replace
+the roster and reactivate it.
+
+Complete a turn with `{}` or `{"proofUrl":"https://example.com/proof.jpg"}`.
+Any active roommate may cover a pending turn. The original assignee and actual
+completing member are recorded separately. Retrying completion as the same member
+returns the original result. Another completion receives HTTP 409.
+At `expiresAt`, the turn becomes missed and completion receives HTTP 409. The UI
+can show overdue when a pending turn has passed `dueAt`. Scheduler status updates
+can lag by one tick, while completion checks expiry immediately.
+
+Pausing stops new occurrence generation. Existing turns keep their deadlines.
+Resuming skips elapsed dates that were never generated during the pause.
+Archiving cancels all pending turns and is terminal. Replacing the roster starts
+newly generated assignments from the first selected member. Already generated
+turns retain their assigned member, including when that member leaves the room.
+An active roommate can cover those turns during the grace period.
+
+Run `go test ./...`. To also run the PostgreSQL migration and lifecycle tests,
+set `TASK_TEST_DATABASE_URL` to a PostgreSQL keyword DSN such as
+`host=localhost port=5432 user=user password=password dbname=roommate sslmode=disable`.
+Tests create and remove an isolated schema and require schema creation permission.
