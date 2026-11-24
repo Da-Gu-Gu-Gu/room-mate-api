@@ -201,7 +201,7 @@ Social login request body for either provider:
 
 The API requires a verified email from the provider. For a new provider identity, it creates a user and auth identity in a database transaction. Existing provider identities resolve to their linked user. A successful login returns an access token, Bearer token type, and user data. The JWT is signed with HS256 and expires after 24 hours.
 
-The current `AuthResponse` DTO does not define JSON tags for its top-level fields, so the response keys are `AccessToken`, `TokenType`, and `User` (not camelCase). The nested user fields use their `UserResponse` JSON tags. Google login includes `createdAt` and `updatedAt`; the Apple handler currently omits those two fields.
+The current `AuthResponse` DTO does not define JSON tags for its top-level fields, so the response keys are `AccessToken`, `TokenType`, and `User` (not camelCase). The nested user fields use their `UserResponse` JSON tags.
 
 Example response shape:
 
@@ -389,22 +389,22 @@ The bill must belong to the room in :id, and the authenticated requester must be
 1. If the bill has a receipt image, the client uploads it through POST /api/v1/uploads/images and receives a permanent imageUrl.
 2. The client creates the bill and may pass that URL as receiptImageUrl. The API verifies that the requester is an active room member and validates that the URL belongs to the configured S3 bucket and uploads/images/ prefix. The bill is created with pending status; the request DTO's optional status field is currently ignored by the service.
 3. The client assigns member shares through POST /api/v1/rooms/:id/bills/:billId/shares. Each selected user must be an active member, amounts must be positive and unique per user, and the sum must equal the bill total. Assignment is one-time per bill.
-4. A member submits a payment against their own share through POST /api/v1/rooms/:id/bills/:billId/payments. The request includes billShareId, a positive amount, proofUrl, and an optional note. The authenticated user is used as the payer. Partial payments are supported, and the amount cannot exceed the remaining share amount calculated from existing pending and approved payments.
-
-   Example payment request:
-
-1. A member submits a payment against their own bill share through POST /api/v1/rooms/:id/bills/:billId/payments. The authenticated user is used as the payer; clients cannot choose the payer or initial status.
-2. The request includes billShareId, a positive amount, proofUrl, and an optional note. Partial payments are supported.
-3. The payment is created with pending status. Pending and approved amounts count toward the share's committed amount; rejected payments do not.
-4. The bill creator reviews the payment using the approve or reject endpoint. Other members receive HTTP 403.
-5. A review records reviewedBy and reviewedAt. Only pending payments can be reviewed; attempts to review an already approved or rejected payment return HTTP 409.
-6. Review is transactional and locks the bill and payment rows so concurrent review requests cannot both change the same pending payment.
-
-5. The payment is created with pending status. Rejected payments do not count toward the committed share amount.
-6. The active room owner (the active room membership with the owner/admin role) reviews the pending payment using the approve or reject endpoint. A bill creator who is not the room owner cannot review it; other non-owner users receive HTTP 403. Review endpoints do not require a request body.
+4. A member submits a payment against their own bill share through POST /api/v1/rooms/:id/bills/:billId/payments. The request includes billShareId, a positive amount, proofUrl, and an optional note. The authenticated user is used as the payer, and clients cannot choose the payer or initial status. Partial payments are supported.
+5. The payment is created with pending status. Pending and approved payments count toward the share's committed amount; rejected payments do not. The amount cannot exceed the remaining committed balance for the selected share.
+6. The bill creator reviews the pending payment using the approve or reject endpoint. Other users receive HTTP 403. Review endpoints do not require a request body.
 7. A review records reviewedBy and reviewedAt. Only pending payments can be reviewed; attempts to review an already approved or rejected payment return HTTP 409. Review is transactional and locks the bill and payment rows so concurrent review requests cannot both change the same pending payment.
+8. Members can read share-level payment summaries through GET /api/v1/rooms/:id/bills/:billId/shares. The router does not expose a GET/list/detail route for individual payment records; the bill GET endpoint returns the bill record, not payment history.
 
-**Current read-endpoint limitation:** the router does not currently register a GET route for bill shares, and it does not expose a GET/list/detail route for payments. Although a GetRoomBillShares handler method exists, it is not wired into the router. The bill GET endpoint returns the bill record, not its payment history. Therefore, members (including the bill creator) cannot currently fetch approved/rejected payment records through a dedicated read endpoint; the review response is returned only to the room owner who performed the review.
+Example payment request:
+
+~~~json
+{
+  "billShareId": "<bill-share-uuid>",
+  "amount": 300,
+  "proofUrl": "https://your-bucket.s3.ap-southeast-1.amazonaws.com/uploads/images/<uuid>.jpg",
+  "note": "November payment"
+}
+~~~
 
 ### 4. Leave a room or transfer ownership
 
